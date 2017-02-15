@@ -432,4 +432,8 @@ def main():
 
 if __name__ == '__main__':
     ARGS = parse_args()
+    # Constants describing the training process.
+    MOVING_AVERAGE_DECAY = 0.9999     # The decay to use for the moving average.
+    NUM_EPOCHS_PER_DECAY = 5          # Epochs after which learning rate decays.
+    LEARNING_RATE_DECAY_FACTOR = 0.9  # Learning rate decay factor.
     main()
