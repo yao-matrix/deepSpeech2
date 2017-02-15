@@ -15,7 +15,7 @@ steps in 32 hours of training time.
 
 Usage:
 Please see the tutorial and website for how to download the Librispeech
-data set, gernerate the TFRecord files of features and train the model.
+data set, generate the TFRecord files of features and train the model.
 
 
 """
