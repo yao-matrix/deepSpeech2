@@ -1,4 +1,4 @@
-# deepSpeech
+# TensorFlow implementation of deepSpeech
 End-to-end speech recognition using distributed TensorFlow
 
 This repository contains TensorFlow code for an end-to-end speech recognition engine using Deep Neural Networks inspired by Baidu's DeepSpeech model, that can train on multiple GPUs.
