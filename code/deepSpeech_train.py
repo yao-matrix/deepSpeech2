@@ -381,7 +381,7 @@ def train():
 
         # Track the moving averages of all trainable variables.
         variable_averages = tf.train.ExponentialMovingAverage(
-            deepSpeech.MOVING_AVERAGE_DECAY, global_step)
+            MOVING_AVERAGE_DECAY, global_step)
         variables_averages_op = variable_averages.apply(
             tf.trainable_variables())
 
