@@ -219,14 +219,14 @@ def set_learning_rate():
     num_batches_per_epoch = (deepSpeech.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN /
                              ARGS.batch_size)
     decay_steps = int(num_batches_per_epoch *
-                      deepSpeech.NUM_EPOCHS_PER_DECAY)
+                      NUM_EPOCHS_PER_DECAY)
 
     # Decay the learning rate exponentially based on the number of steps.
     learning_rate = tf.train.exponential_decay(
         ARGS.initial_lr,
         global_step,
         decay_steps,
-        deepSpeech.LEARNING_RATE_DECAY_FACTOR,
+        LEARNING_RATE_DECAY_FACTOR,
         staircase=True)
 
     return learning_rate, global_step
