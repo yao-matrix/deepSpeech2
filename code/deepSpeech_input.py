@@ -11,7 +11,7 @@ import tensorflow as tf
 # Note this definition must match the ALPHABET chosen in
 # preprocess_Librispeech.py
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ' "  # for LibriSpeech
-NUM_CLASSES = len(ALPHABET) + 1  # For blank character
+NUM_CLASSES = len(ALPHABET) + 1  # Additional class for blank character
 NUM_PER_EPOCH_FOR_TRAIN = 28535
 NUM_PER_EPOCH_FOR_EVAL = 2703
 NUM_PER_EPOCH_FOR_TEST = 2620
