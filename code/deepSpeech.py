@@ -161,7 +161,7 @@ def inference(feats, seq_lens, params):
 
 
 def loss(logits, labels, seq_lens):
-    """Add L2Loss to all the trainable variables.
+    """Compute mean CTC Loss.
 
     Add summary for "Loss" and "Loss/avg".
     Args:
