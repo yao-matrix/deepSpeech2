@@ -4,7 +4,6 @@ End-to-end speech recognition using distributed TensorFlow
 This repository contains TensorFlow code for an end-to-end speech recognition engine using Deep Neural Networks inspired by Baidu's DeepSpeech model, that can train on multiple GPUs.
 Please see the accompanying website for more documentation:
 https://pages.github.com/FordSpeech
-This repository contains TensorFlow code for an end-to-end speech recognition engine using Deep Neural Networks inspired by Baidu's DeepSpeech model, that can train on multiple GPUs. Please see the accompanying website for more documentation: https://pages.github.ford.com/lkrishn7/2016/11/14/deepspeech.html
 
 This software is released under a BSD license. The license to this software does not apply to TensorFlow, which is available under the Apache 2.0 license, or the third party pre-requisites listed below, which are available under their own respective licenses.
 
