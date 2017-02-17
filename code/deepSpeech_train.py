@@ -180,7 +180,7 @@ def average_gradients(tower_grads):
 
     Note that this function provides a synchronization point across all towers.
 
-    ARGS:
+    Args:
       tower_grads: List of lists of (gradient, variable) tuples. The outer list
         is over individual gradients. The inner list is over the gradient
         calculation for each tower.
@@ -241,7 +241,7 @@ def set_learning_rate():
 def fetch_data():
     """ Fetch features, labels and sequence_lengths from a common queue."""
 
-    tot_batch_size = ARGS.batch_size*ARGS.num_gpus
+    tot_batch_size = ARGS.batch_size * ARGS.num_gpus
     feats, labels, seq_lens = deepSpeech.inputs(eval_data='train',
                                                 data_dir=ARGS.data_dir,
                                                 batch_size=tot_batch_size,
