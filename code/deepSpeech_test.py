@@ -10,7 +10,7 @@ judged by deepSpeech_test.py.
 Speed:
 On a machine with 3 TitanX(Pascal) GPUs, deepSpeech_train.py processes
 a single batch of 32 utterancesin 0.25-1.25 sec based on utterance lengths.
-The model reaches ~18% char_err_rate on the test set after 30K
+The model reaches ~15% char_err_rate on the test set after 30K
 steps in 32 hours of training time.
 
 Usage:
