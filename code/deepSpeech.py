@@ -27,6 +27,10 @@ from helper_routines import _activation_summary
 
 # Global constants describing the speech data set.
 NUM_CLASSES = deepSpeech_input.NUM_CLASSES
+NUM_PER_EPOCH_FOR_TRAIN = deepSpeech_input.NUM_PER_EPOCH_FOR_TRAIN
+NUM_PER_EPOCH_FOR_EVAL = deepSpeech_input.NUM_PER_EPOCH_FOR_EVAL
+NUM_PER_EPOCH_FOR_TEST = deepSpeech_input.NUM_PER_EPOCH_FOR_TEST
+
 
 def inputs(eval_data, data_dir, batch_size, use_fp16, shuffle):
     """Construct input for LibriSpeech model evaluation using the Reader ops.

@@ -71,6 +71,7 @@ def parse_args():
         args.num_filters = params['num_filters']
         args.use_fp16 = params['use_fp16']
         args.temporal_stride = params['temporal_stride']
+        args.moving_avg_decay = params['moving_avg_decay']
     return args
 
 
@@ -199,7 +200,7 @@ def evaluate():
 
         # Build ops that computes the logits predictions from the
         # inference model.
-        ARGS.keep_prob = 1.0 # Disable dropout during testing.
+        ARGS.keep_prob = 1.0  # Disable dropout during testing.
         logits = deepSpeech.inference(feats, seq_lens, ARGS)
 
         # Calculate predictions.
@@ -210,7 +211,7 @@ def evaluate():
 
         # Restore the moving average version of the learned variables for eval.
         variable_averages = tf.train.ExponentialMovingAverage(
-            deepSpeech.MOVING_AVERAGE_DECAY)
+            ARGS.moving_avg_decay)
         variables_to_restore = variable_averages.variables_to_restore()
         saver = tf.train.Saver(variables_to_restore)
 

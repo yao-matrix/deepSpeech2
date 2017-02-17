@@ -92,6 +92,13 @@ def parse_args():
                         help='Initial learning rate for training')
     parser.add_argument('--num_filters', type=int, default=64,
                         help='Number of convolutional filters')
+    parser.add_argument('--moving_avg_decay', type=float, default=0.9999,
+                        help='Decay to use for the moving average of weights')
+    parser.add_argument('--num_epochs_per_decay', type=int, default=5,
+                        help='Epochs after which learning rate decays')
+    parser.add_argument('--lr_decay_factor', type=float, default=0.9,
+                        help='Learning rate decay factor')
+
     args = parser.parse_args()
 
     # Read architecture hyper-parameters from checkpoint file
@@ -216,17 +223,16 @@ def set_learning_rate():
         initializer=tf.constant_initializer(0), trainable=False)
 
     # Calculate the learning rate schedule.
-    num_batches_per_epoch = (deepSpeech.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN /
+    num_batches_per_epoch = (deepSpeech.NUM_PER_EPOCH_FOR_TRAIN /
                              ARGS.batch_size)
-    decay_steps = int(num_batches_per_epoch *
-                      NUM_EPOCHS_PER_DECAY)
+    decay_steps = int(num_batches_per_epoch * ARGS.num_epochs_per_decay)
 
     # Decay the learning rate exponentially based on the number of steps.
     learning_rate = tf.train.exponential_decay(
         ARGS.initial_lr,
         global_step,
         decay_steps,
-        LEARNING_RATE_DECAY_FACTOR,
+        ARGS.lr_decay_factor,
         staircase=True)
 
     return learning_rate, global_step
@@ -381,7 +387,7 @@ def train():
 
         # Track the moving averages of all trainable variables.
         variable_averages = tf.train.ExponentialMovingAverage(
-            MOVING_AVERAGE_DECAY, global_step)
+            ARGS.moving_avg_decay, global_step)
         variables_averages_op = variable_averages.apply(
             tf.trainable_variables())
 
@@ -432,8 +438,4 @@ def main():
 
 if __name__ == '__main__':
     ARGS = parse_args()
-    # Constants describing the training process.
-    MOVING_AVERAGE_DECAY = 0.9999     # The decay to use for the moving average.
-    NUM_EPOCHS_PER_DECAY = 5          # Epochs after which learning rate decays.
-    LEARNING_RATE_DECAY_FACTOR = 0.9  # Learning rate decay factor.
     main()
