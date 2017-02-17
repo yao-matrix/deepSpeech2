@@ -18,12 +18,11 @@ NUM_PER_EPOCH_FOR_TEST = 2620
 
 
 def _generate_feats_and_label_batch(filename_queue, batch_size):
-    """Construct a queued batch of spectrograms and transcriptions.
+    """Construct a queued batch of spectral features and transcriptions.
 
     Args:
       filename_queue: queue of filenames to read data from.
-      batch_size: Number of images per batch.
-
+      batch_size: Number of utterances per batch.
 
     Returns:
       feats: mfccs. 4D tensor of [batch_size, height, width, 3] size.
@@ -39,7 +38,8 @@ def _generate_feats_and_label_batch(filename_queue, batch_size):
         "labels": tf.VarLenFeature(dtype=tf.int64)
     }
     sequence_features = {
-        "feats": tf.FixedLenSequenceFeature([13, ], dtype=tf.float32)
+        # mfcc features are 13 dimensional
+        "feats": tf.FixedLenSequenceFeature([13, ], dtype=tf.float32) 
     }
 
     # Parse the example (returns a dictionary of tensors)
