@@ -35,7 +35,11 @@ def inputs(eval_data, data_dir, batch_size, use_fp16, shuffle):
     """Construct input for LibriSpeech model evaluation using the Reader ops.
 
     Args:
-      eval_data: bool, indicating if one should use the train or eval data set.
+      eval_data: 'train', 'test' or 'eval'
+      data_dir: folder containing the pre-processed data
+      batch_size: int,size of mini-batch
+      use_fp16: bool, if True use fp16 else fp32
+      shuffle: bool, to shuffle the tfrecords or not. 
 
     Returns:
       feats: MFCC. 4D tensor of [batch_size, T, F, 1] size.
