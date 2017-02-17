@@ -43,7 +43,7 @@ On a Linux machine with GPU support, use:
 ```
 *Step 2: Clone this git repo.*
 ```
-(SpeechRecog)$ git clone https://github.ford.com/lkrishn7/deepSpeech.git
+(SpeechRecog)$ git clone https://github.com/FordSpeech/deepSpeech.git
 (SpeechRecog)$ cd deepSpeech
 ```
 
