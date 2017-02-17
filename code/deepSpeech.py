@@ -5,9 +5,8 @@
 
 Summary of major functions:
 
-  # Compute input feats and labels for training. If you would like to run
-  # evaluations, use inputs() instead.
-  inputs, labels, seq_len = distorted_inputs()
+  # Compute input feats and labels for training. 
+  inputs, labels, seq_len = inputs()
 
   # Compute inference on the model inputs to make a prediction.
   predictions = inference(inputs)
