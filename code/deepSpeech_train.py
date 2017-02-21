@@ -13,8 +13,7 @@ speech recognition." arXiv preprint arXiv:1412.5567 (2014).
 
 Accuracy:
 deepSpeech_multi_gpu_train.py achieves 15% CER on LibriSpeech data
-after 30k steps (~100
-epochs of data) as judged by deepSpeech_test.py.
+after 30k steps (~100 epochs of data) as judged by deepSpeech_test.py.
 
 Speed: With batch_size 128.
 
