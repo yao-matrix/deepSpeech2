@@ -4,7 +4,7 @@
 """Evaluation for deepSpeech.
 
 Accuracy:
-deepSpeech_train.py achieves 18% char_err_rate after 30K steps as
+deepSpeech_train.py achieves 15% char_err_rate after 30K steps as
 judged by deepSpeech_test.py.
 
 Speed:
