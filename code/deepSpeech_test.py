@@ -87,7 +87,7 @@ def initialize_from_checkpoint(sess, saver):
     """ Initialize variables on the graph"""
 
     # Initialise variables from a checkpoint file, if provided.
-    ckpt = tf.train.get_checkpoint_state(ARGS.checkpoint)
+    ckpt = tf.train.get_checkpoint_state(ARGS.checkpoint_dir)
     if ckpt and ckpt.model_checkpoint_path:
         # Restores from checkpoint
         saver.restore(sess, ckpt.model_checkpoint_path)
