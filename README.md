@@ -83,9 +83,11 @@ Training a model
 The script train.sh contains commands to train on utterances in sorted order for the first epoch and then to resume training on shuffled utterances.
 Note that during the first epoch, the cost will increase and it will take longer to train on later steps because the utterances are presented in sorted order to the network.
 
-Visualising training
+Monitoring training
 --------------------
+Since the training data is fed through a shuffled queue, to check validation loss a separate graph needs to be set up in a different session and potentially on an additional GPU. This graph is fed with the valildation data to compute predictions. The deepSpeech_test.py script initializes the graph from a previously saved checkpoint file and computes the CER on the eval_data every 5 minutes by default. It saves the computed CER values in the models/librispeech/eval folder. By calling tensorboard with logdir set to models/librispeech, it is possible to monitor validation CER and training loss during training.
 ```
+(SpeechRecog)$python deepSpeech_test.py --eval_data 'val' --checkpoint_dir PATH_TO_SAVED_CHECKPOINT_FILE
 (SpeechRecog)$tensorboard --logdir PATH_TO_SUMMARY
 ```
 Testing a model
