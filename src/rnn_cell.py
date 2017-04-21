@@ -12,24 +12,7 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import array_ops
 import tensorflow as tf
 
-
-def _variable_on_cpu(name, shape, initializer=None, use_fp16=False):
-    """Helper to create a Variable stored on cpu memory.
-
-    Args:
-      name: name of the variable
-      shape: list of ints
-      initializer: initializer for Variable
-
-    Returns:
-      Variable Tensor
-    """
-    with tf.device('/cpu'):
-        dtype = tf.float16 if use_fp16 else tf.float32
-        var = tf.get_variable(name, shape=shape, initializer=initializer,
-                              dtype=dtype)
-    return var
-
+from helper_routines import _variable_on_cpu
 
 class CustomRNNCell(rnn_cell.BasicRNNCell):
     """ This is a custoRNNCell that allows the weights
@@ -39,21 +22,37 @@ class CustomRNNCell(rnn_cell.BasicRNNCell):
     pin weights on one device (say cpu).
     """
 
-    def __init__(self, num_units, activation=tanh, use_fp16=False):
+    def __init__(self, num_units, use_fp16 = False):
         self._num_units = num_units
-        self._activation = activation
         self.use_fp16 = use_fp16
 
-    def __call__(self, inputs, state, scope=None):
+    def __call__(self, inputs, state, scope = None):
         """Most basic RNN:
-        output = new_state = activation(W * input + U * state + B)."""
-        with vs.variable_scope(scope or type(self).__name__):  # "BasicRNNCell"
-            output = self._activation(_linear([inputs, state], self._num_units,
-                                              True, use_fp16=self.use_fp16))
+        output = new_state = activation(BN(W * input) + U * state + B)."""
+        with vs.variable_scope(scope or type(self).__name__):
+            wsize = inputs.get_shape().as_list()[1]
+            w = _variable_on_cpu('W', [wsize, self._num_units], use_fp16 = self.use_fp16)
+            resi = math_ops.matmul(inputs, w)
+            bn_resi = tf.layers.batch_norm(resi, epsilon = 1e-5, training = True, reuse = True)
+            usize = state.get_shape().as_list()[1]
+            u = _variable_on_cpu('U', [usize, self._num_units], use_fp16 = self.use_fp16)
+            resu = math_ops.matmul(state, u)
+            bias = _variable_on_cpu('B', [self._num_units],
+                                     tf.constant_initializer(0),
+                                     use_fp16 = self.use_fp16)
+            output = relux(tf.add(bn_resi, resu) + bias, capping = 20)
         return output, output
 
 
-def _linear(args, output_size, bias, scope=None, use_fp16=False):
+def relux(x, capping = None):
+    """Clipped ReLU"""
+    x = tf.nn.relu(x)
+    if capping is not None:
+        y = tf.minimum(x, capping)
+    return y
+
+
+def _linear(args, output_size, bias, scope = None, use_fp16 = False):
     """Linear map: sum_i(args[i] * W[i]), where W[i] is a variable.
 
     Args:
@@ -93,7 +92,7 @@ def _linear(args, output_size, bias, scope=None, use_fp16=False):
     # Now the computation.
     with vs.variable_scope(scope or "Linear"):
         matrix = _variable_on_cpu('Matrix', [total_arg_size, output_size],
-                                  use_fp16=use_fp16)
+                                  use_fp16 = use_fp16)
         if use_fp16:
             dtype = tf.float16
         else:

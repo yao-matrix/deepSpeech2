@@ -46,57 +46,57 @@ def parse_args():
     num_gpus = len([x for x in device_lib.list_local_devices()
                     if x.device_type == "GPU"])
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train_dir', type=str,
-                        default='../models/librispeech/train',
-                        help='Directory to write event logs and checkpoints')
-    parser.add_argument('--data_dir', type=str,
-                        default='../data/librispeech/processed/',
-                        help='Path to the audio data directory')
-    parser.add_argument('--max_steps', type=int, default=20000,
-                        help='Number of batches to run')
-    parser.add_argument('--num_gpus', type=int, default=num_gpus,
-                        help='How many GPUs to use')
-    parser.add_argument('--log_device_placement', type=bool, default=False,
-                        help='Whether to log device placement')
-    parser.add_argument('--batch_size', type=int, default=32,
-                        help='Number of inputs to process in a batch per GPU')
-    parser.add_argument('--temporal_stride', type=int, default=2,
-                        help='Stride along time')
+    parser.add_argument('--train_dir', type = str,
+                        default = '../models/librispeech/train',
+                        help = 'Directory to write event logs and checkpoints')
+    parser.add_argument('--data_dir', type = str,
+                        default = '',
+                        help = 'Path to the audio data directory')
+    parser.add_argument('--max_steps', type = int, default = 20000,
+                        help = 'Number of batches to run')
+    parser.add_argument('--num_gpus', type = int, default = num_gpus,
+                        help = 'How many GPUs to use')
+    parser.add_argument('--log_device_placement', type = bool, default = False,
+                        help = 'Whether to log device placement')
+    parser.add_argument('--batch_size', type = int, default = 32,
+                        help = 'Number of inputs to process in a batch per GPU')
+    parser.add_argument('--temporal_stride', type = int, default = 1,
+                        help = 'Stride along time')
 
-    feature_parser = parser.add_mutually_exclusive_group(required=False)
-    feature_parser.add_argument('--shuffle', dest='shuffle',
-                                action='store_true')
-    feature_parser.add_argument('--no-shuffle', dest='shuffle',
-                                action='store_false')
-    parser.set_defaults(shuffle=True)
+    feature_parser = parser.add_mutually_exclusive_group(required = False)
+    feature_parser.add_argument('--shuffle', dest = 'shuffle',
+                                action = 'store_true')
+    feature_parser.add_argument('--no-shuffle', dest = 'shuffle',
+                                action = 'store_false')
+    parser.set_defaults(shuffle = True)
 
-    feature_parser = parser.add_mutually_exclusive_group(required=False)
-    feature_parser.add_argument('--use_fp16', dest='use_fp16',
-                                action='store_true')
-    feature_parser.add_argument('--use_fp32', dest='use_fp16',
-                                action='store_false')
-    parser.set_defaults(use_fp16=False)
+    feature_parser = parser.add_mutually_exclusive_group(required = False)
+    feature_parser.add_argument('--use_fp16', dest = 'use_fp16',
+                                action = 'store_true')
+    feature_parser.add_argument('--use_fp32', dest = 'use_fp16',
+                                action = 'store_false')
+    parser.set_defaults(use_fp16 = False)
 
-    parser.add_argument('--keep_prob', type=float, default=0.5,
-                        help='Keep probability for dropout')
-    parser.add_argument('--num_hidden', type=int, default=1024,
-                        help='Number of hidden nodes')
-    parser.add_argument('--num_rnn_layers', type=int, default=2,
-                        help='Number of recurrent layers')
-    parser.add_argument('--checkpoint', type=str, default=None,
-                        help='Continue training from checkpoint file')
-    parser.add_argument('--rnn_type', type=str, default='uni-dir',
-                        help='uni-dir or bi-dir')
-    parser.add_argument('--initial_lr', type=float, default=0.00001,
-                        help='Initial learning rate for training')
-    parser.add_argument('--num_filters', type=int, default=64,
-                        help='Number of convolutional filters')
-    parser.add_argument('--moving_avg_decay', type=float, default=0.9999,
-                        help='Decay to use for the moving average of weights')
-    parser.add_argument('--num_epochs_per_decay', type=int, default=5,
-                        help='Epochs after which learning rate decays')
-    parser.add_argument('--lr_decay_factor', type=float, default=0.9,
-                        help='Learning rate decay factor')
+    parser.add_argument('--keep_prob', type = float, default = 0.5,
+                        help = 'Keep probability for dropout')
+    parser.add_argument('--num_hidden', type = int, default = 1024,
+                        help = 'Number of hidden nodes')
+    parser.add_argument('--num_rnn_layers', type = int, default = 2,
+                        help = 'Number of recurrent layers')
+    parser.add_argument('--checkpoint', type = str, default = None,
+                        help = 'Continue training from checkpoint file')
+    parser.add_argument('--rnn_type', type = str, default = 'bi-dir',
+                        help = 'uni-dir or bi-dir')
+    parser.add_argument('--initial_lr', type = float, default = 0.00001,
+                        help = 'Initial learning rate for training')
+    parser.add_argument('--num_filters', type = int, default = 32,
+                        help = 'Number of convolutional filters')
+    parser.add_argument('--moving_avg_decay', type = float, default = 0.9999,
+                        help = 'Decay to use for the moving average of weights')
+    parser.add_argument('--num_epochs_per_decay', type = int, default = 5,
+                        help = 'Epochs after which learning rate decays')
+    parser.add_argument('--lr_decay_factor', type = float, default = 0.9,
+                        help = 'Learning rate decay factor')
 
     args = parser.parse_args()
 
@@ -149,10 +149,10 @@ def tower_loss(scope, feats, labels, seq_lens):
     losses = tf.get_collection('losses', scope)
 
     # Calculate the total loss for the current tower.
-    total_loss = tf.add_n(losses, name='total_loss')
+    total_loss = tf.add_n(losses, name = 'total_loss')
 
     # Compute the moving average of all individual losses and the total loss.
-    loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
+    loss_averages = tf.train.ExponentialMovingAverage(0.9, name = 'avg')
     loss_averages_op = loss_averages.apply(losses + [total_loss])
 
     # Attach a scalar summary to all individual losses and the total loss;
@@ -219,7 +219,7 @@ def set_learning_rate():
     # This equals the number of batches processed * ARGS.num_gpus.
     global_step = tf.get_variable(
         'global_step', [],
-        initializer=tf.constant_initializer(0), trainable=False)
+        initializer = tf.constant_initializer(0), trainable = False)
 
     # Calculate the learning rate schedule.
     num_batches_per_epoch = (deepSpeech.NUM_PER_EPOCH_FOR_TRAIN /
@@ -232,7 +232,7 @@ def set_learning_rate():
         global_step,
         decay_steps,
         ARGS.lr_decay_factor,
-        staircase=True)
+        staircase = True)
 
     return learning_rate, global_step
 
@@ -241,11 +241,11 @@ def fetch_data():
     """ Fetch features, labels and sequence_lengths from a common queue."""
 
     tot_batch_size = ARGS.batch_size * ARGS.num_gpus
-    feats, labels, seq_lens = deepSpeech.inputs(eval_data='train',
-                                                data_dir=ARGS.data_dir,
-                                                batch_size=tot_batch_size,
-                                                use_fp16=ARGS.use_fp16,
-                                                shuffle=ARGS.shuffle)
+    feats, labels, seq_lens = deepSpeech.inputs(eval_data = 'train',
+                                                data_dir = ARGS.data_dir,
+                                                batch_size = tot_batch_size,
+                                                use_fp16 = ARGS.use_fp16,
+                                                shuffle = ARGS.shuffle)
 
     # Split features and labels and sequence lengths for each tower
     split_feats = tf.split(0, ARGS.num_gpus, feats)
@@ -382,7 +382,7 @@ def train():
 
         # Apply the gradients to adjust the shared variables.
         apply_gradient_op = optimizer.apply_gradients(grads,
-                                                      global_step=global_step)
+                                                      global_step = global_step)
 
         # Track the moving averages of all trainable variables.
         variable_averages = tf.train.ExponentialMovingAverage(
@@ -397,14 +397,14 @@ def train():
         summary_op = add_summaries(summaries, learning_rate, grads)
 
         # Create a saver.
-        saver = tf.train.Saver(tf.all_variables(), max_to_keep=100)
+        saver = tf.train.Saver(tf.all_variables(), max_to_keep = 100)
 
         # Start running operations on the Graph. allow_soft_placement
         # must be set to True to build towers on GPU, as some of the
         # ops do not have GPU implementations.
         sess = tf.Session(config=tf.ConfigProto(
-            allow_soft_placement=True,
-            log_device_placement=ARGS.log_device_placement))
+            allow_soft_placement = True,
+            log_device_placement = ARGS.log_device_placement))
 
         # Initialize vars.
         if ARGS.checkpoint is not None:
