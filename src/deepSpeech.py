@@ -111,10 +111,10 @@ def inference(feats, seq_lens, params):
         bias = tf.nn.bias_add(conv, biases)
         ## N, T, F, 32
         # batch normalization
-        bn = tf.layers.batch_norm(bias, epsilon = 1e-5, training = True, reuse = True)
+        bn = rnn_cell.batch_norm(bias, n_out = params.num_filters)
 
         # clipped ReLU
-        conv1 = relux(bn, capping = 20)
+        conv1 = rnn_cell.relux(bn, capping = 20)
         _activation_summary(conv1)
 
     with tf.variable_scope('conv2') as scope:
@@ -125,7 +125,7 @@ def inference(feats, seq_lens, params):
             wd_value = None, use_fp16 = params.use_fp16)
 
         ## N. T, F, 32
-        conv = tf.nn.conv2d(feats, kernel,
+        conv = tf.nn.conv2d(conv1, kernel,
                             [1, 2, 1, 1],
                             padding = 'VALID')
         biases = _variable_on_cpu('biases', [params.num_filters],
@@ -134,10 +134,10 @@ def inference(feats, seq_lens, params):
         bias = tf.nn.bias_add(conv, biases)
         ## N, T, F, 32
         # batch normalization
-        bn = tf.layers.batch_norm(bias, epsilon = 1e-5, training = True, reuse = True)
+        bn = rnn_cell.batch_norm(bias, n_out = params.num_filters)
 
         # clipped ReLU
-        conv2 = relux(bn, capping = 20)
+        conv2 = rnn_cell.relux(bn, capping = 20)
         _activation_summary(conv2)
 
     ######################
@@ -153,7 +153,7 @@ def inference(feats, seq_lens, params):
         cell = rnn_cell.CustomRNNCell(
             params.num_hidden,
             use_fp16 = params.use_fp16)
-        multi_cell = tf.nn.rnn_cell.MultiRNNCell([cell] * params.num_rnn_layers)
+        multi_cell = tf.contrib.rnn.MultiRNNCell([cell] * params.num_rnn_layers)
 
         seq_lens = tf.div(seq_lens, params.temporal_stride)
         if params.rnn_type == 'uni-dir':

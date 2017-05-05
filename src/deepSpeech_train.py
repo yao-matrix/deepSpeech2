@@ -248,9 +248,9 @@ def fetch_data():
                                                 shuffle = ARGS.shuffle)
 
     # Split features and labels and sequence lengths for each tower
-    split_feats = tf.split(0, ARGS.num_gpus, feats)
-    split_labels = tf.sparse_split(0, ARGS.num_gpus, labels)
-    split_seq_lens = tf.split(0, ARGS.num_gpus, seq_lens)
+    split_feats = tf.split(feats, ARGS.num_gpus, 0)
+    split_labels = tf.sparse_split(sp_input = labels, num_split = ARGS.num_gpus, axis = 0)
+    split_seq_lens = tf.split(seq_lens, ARGS.num_gpus, 0)
 
     return split_feats, split_labels, split_seq_lens
 

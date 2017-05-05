@@ -4,7 +4,7 @@ Default RNNCell in TensorFlow throws errors when
 variables are re-used between devices.
 """
 
-from tensorflow.python.ops import rnn_cell
+from tensorflow.contrib.rnn import BasicRNNCell
 from tensorflow.python.ops.math_ops import tanh
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.util import nest
@@ -14,7 +14,7 @@ import tensorflow as tf
 
 from helper_routines import _variable_on_cpu
 
-class CustomRNNCell(rnn_cell.BasicRNNCell):
+class CustomRNNCell(BasicRNNCell):
     """ This is a custoRNNCell that allows the weights
     to be re-used on multiple devices. In particular, the Matrix of weights is
     set using _variable_on_cpu.
@@ -33,7 +33,8 @@ class CustomRNNCell(rnn_cell.BasicRNNCell):
             wsize = inputs.get_shape().as_list()[1]
             w = _variable_on_cpu('W', [wsize, self._num_units], use_fp16 = self.use_fp16)
             resi = math_ops.matmul(inputs, w)
-            bn_resi = tf.layers.batch_norm(resi, epsilon = 1e-5, training = True, reuse = True)
+            # reshape here to batch norm on 
+            bn_resi = batch_norm(resi, n_out = )
             usize = state.get_shape().as_list()[1]
             u = _variable_on_cpu('U', [usize, self._num_units], use_fp16 = self.use_fp16)
             resu = math_ops.matmul(state, u)
@@ -50,6 +51,25 @@ def relux(x, capping = None):
     if capping is not None:
         y = tf.minimum(x, capping)
     return y
+
+
+def batch_norm(x, n_out, is_train = True):
+    """batch normalization"""
+    with tf.variable_scope('bn'):
+        beta = _variable_on_cpu('beta', [n_out], initializer = tf.zeros_initializer())
+        gamma = _variable_on_cpu('gamma', [n_out], initializer = tf.ones_initializer())
+        batch_mean, batch_var = tf.nn.moments(x, [0, 1, 2], name = 'moments')
+        ema = tf.train.ExponentialMovingAverage(decay = 0.5)
+        def mean_var_with_update():
+            ema_apply_op = ema.apply([batch_mean, batch_var])
+            with tf.control_dependencies([ema_apply_op]):
+                return tf.identity(batch_mean), tf.identity(batch_var)
+        if is_train:
+            mean, var = mean_var_with_update()
+        else:
+            mean, var = lambda:(ema.average(batch_mean), ema.average(batch_var))
+        normed = tf.nn.batch_normalization(x, mean, var, beta, gamma, 1e-5)
+    return normed
 
 
 def _linear(args, output_size, bias, scope = None, use_fp16 = False):
