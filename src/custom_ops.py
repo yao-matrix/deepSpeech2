@@ -22,7 +22,29 @@ class CustomRNNCell(BasicRNNCell):
     pin weights on one device (say cpu).
     """
 
-    def __init__(self, num_units, use_fp16 = False):
+    def __init__(self, num_units, activation = tf.nn.relu6, use_fp16 = False):
+        self._num_units = num_units
+        self._activation = activation
+        self.use_fp16 = use_fp16
+
+    def __call__(self, inputs, state, scope = None):
+        """Most basic RNN:
+        output = new_state = activation(W * input + U * state + B)."""
+        with vs.variable_scope(scope or type(self).__name__):
+            output = self._activation(_linear([inputs, state], self._num_units,
+                                              True, use_fp16 = self.use_fp16))
+        return output, output
+
+
+class CustomRNNCell2(BasicRNNCell):
+    """ This is a custoRNNCell2 that allows the weights
+    to be re-used on multiple devices. In particular, the Matrix of weights is
+    set using _variable_on_cpu.
+    The default version of the BasicRNNCell, did not support the ability to
+    pin weights on one device (say cpu).
+    """
+
+    def __init__(self, num_units, activation = tf.nn.relu6, use_fp16 = False):
         self._num_units = num_units
         self.use_fp16 = use_fp16
 
@@ -33,15 +55,15 @@ class CustomRNNCell(BasicRNNCell):
             wsize = inputs.get_shape().as_list()[1]
             w = _variable_on_cpu('W', [wsize, self._num_units], use_fp16 = self.use_fp16)
             resi = math_ops.matmul(inputs, w)
-            # reshape here to batch norm on 
-            bn_resi = batch_norm(resi, n_out = )
+            
+            #bn_resi = batch_norm(resi, n_out = 1760)
             usize = state.get_shape().as_list()[1]
             u = _variable_on_cpu('U', [usize, self._num_units], use_fp16 = self.use_fp16)
             resu = math_ops.matmul(state, u)
             bias = _variable_on_cpu('B', [self._num_units],
                                      tf.constant_initializer(0),
                                      use_fp16 = self.use_fp16)
-            output = relux(tf.add(bn_resi, resu) + bias, capping = 20)
+            output = relux(tf.add(resi, resu) + bias, capping = 20)
         return output, output
 
 
@@ -121,7 +143,7 @@ def _linear(args, output_size, bias, scope = None, use_fp16 = False):
         if len(args) == 1:
             res = math_ops.matmul(args[0], matrix)
         else:
-            res = math_ops.matmul(array_ops.concat(1, args), matrix)
+            res = math_ops.matmul(array_ops.concat(args, 1), matrix)
         if not bias:
             return res
         bias_term = _variable_on_cpu('Bias', [output_size],

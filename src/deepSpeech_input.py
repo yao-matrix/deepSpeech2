@@ -55,8 +55,8 @@ def _generate_feats_and_label_batch(filename_queue, batch_size):
         tensors = [sequence_parsed['feats'], context_parsed['labels']],
         batch_size = batch_size,
         bucket_boundaries = list(range(100, 1900, 100)),
-        allow_smaller_final_batch = True,
-        num_threads = 16,
+        allow_smaller_final_batch = False,
+        num_threads = 1,
         dynamic_pad = True)
 
     return feats, tf.cast(labels, tf.int32), seq_len

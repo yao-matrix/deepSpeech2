@@ -22,7 +22,7 @@ Summary of major functions:
 
 import tensorflow as tf
 import deepSpeech_input
-import rnn_cell
+import custom_ops
 from helper_routines import _variable_on_cpu
 from helper_routines import _variable_with_weight_decay
 from helper_routines import _activation_summary
@@ -111,10 +111,10 @@ def inference(feats, seq_lens, params):
         bias = tf.nn.bias_add(conv, biases)
         ## N, T, F, 32
         # batch normalization
-        bn = rnn_cell.batch_norm(bias, n_out = params.num_filters)
+        bn = custom_ops.batch_norm(bias, n_out = params.num_filters)
 
         # clipped ReLU
-        conv1 = rnn_cell.relux(bn, capping = 20)
+        conv1 = custom_ops.relux(bn, capping = 20)
         _activation_summary(conv1)
 
     with tf.variable_scope('conv2') as scope:
@@ -134,10 +134,10 @@ def inference(feats, seq_lens, params):
         bias = tf.nn.bias_add(conv, biases)
         ## N, T, F, 32
         # batch normalization
-        bn = rnn_cell.batch_norm(bias, n_out = params.num_filters)
+        bn = custom_ops.batch_norm(bias, n_out = params.num_filters)
 
         # clipped ReLU
-        conv2 = rnn_cell.relux(bn, capping = 20)
+        conv2 = custom_ops.relux(bn, capping = 20)
         _activation_summary(conv2)
 
     ######################
@@ -150,7 +150,7 @@ def inference(feats, seq_lens, params):
         rnn_input = tf.transpose(rnn_input, perm = [1, 0, 2])
         # Make one instance of cell on a fixed device,
         # and use copies of the weights on other devices.
-        cell = rnn_cell.CustomRNNCell(
+        cell = custom_ops.CustomRNNCell(
             params.num_hidden,
             use_fp16 = params.use_fp16)
         multi_cell = tf.contrib.rnn.MultiRNNCell([cell] * params.num_rnn_layers)
@@ -203,9 +203,11 @@ def loss(logits, labels, seq_lens):
     Returns:
       Loss tensor of type float.
     """
+    xxx = logits.get_shape().as_list()
+    print xxx
+
     # Calculate the average ctc loss across the batch.
-    ctc_loss = tf.nn.ctc_loss(inputs = tf.cast(logits, tf.float32),
-                              labels = labels, sequence_length = seq_lens)
+    ctc_loss = tf.nn.ctc_loss(labels = labels, inputs = tf.cast(logits, tf.float32), sequence_length = seq_lens)
     ctc_loss_mean = tf.reduce_mean(ctc_loss, name = 'ctc_loss')
     tf.add_to_collection('losses', ctc_loss_mean)
 

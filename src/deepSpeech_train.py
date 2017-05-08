@@ -165,8 +165,8 @@ def tower_loss(scope, feats, labels, seq_lens):
                            loss.op.name)
         # Name each loss as '(raw)' and name the moving average
         # version of the loss as the original loss name.
-        tf.scalar_summary(loss_name + '(raw)', loss)
-        tf.scalar_summary(loss_name, loss_averages.average(loss))
+        tf.summary.scalar(loss_name + '(raw)', loss)
+        tf.summary.scalar(loss_name, loss_averages.average(loss))
 
     # Without this loss_averages_op would never run
     with tf.control_dependencies([loss_averages_op]):
@@ -200,7 +200,7 @@ def average_gradients(tower_grads):
             grads.append(expanded_g)
 
         # Average over the 'tower' dimension.
-        grad = tf.concat(0, grads)
+        grad = tf.concat(grads, 0)
         grad = tf.reduce_mean(grad, 0)
 
         # The variables are redundant because they are shared
@@ -239,6 +239,7 @@ def set_learning_rate():
 
 def fetch_data():
     """ Fetch features, labels and sequence_lengths from a common queue."""
+    print "gpu num: ", ARGS.num_gpus
 
     tot_batch_size = ARGS.batch_size * ARGS.num_gpus
     feats, labels, seq_lens = deepSpeech.inputs(eval_data = 'train',
@@ -262,27 +263,28 @@ def get_loss_grads(data, optimizer):
     # Calculate the gradients for each model tower.
     [feats, labels, seq_lens] = data
     tower_grads = []
-    for i in range(ARGS.num_gpus):
-        with tf.device('/gpu:%d' % i):
-            name_scope = '%s_%d' % (helper_routines.TOWER_NAME, i)
-            with tf.name_scope(name_scope) as scope:
-                # Calculate the loss for one tower of the deepSpeech model.
-                # This function constructs the entire deepSpeech model
-                # but shares the variables across all towers.
-                loss = tower_loss(scope, feats[i], labels[i], seq_lens[i])
+    with tf.variable_scope(tf.get_variable_scope()) as scope:
+        for i in range(ARGS.num_gpus):
+            with tf.device('/gpu:%d' % i):
+                name_scope = '%s_%d' % (helper_routines.TOWER_NAME, i)
+                with tf.name_scope(name_scope) as scope:
+                    # Calculate the loss for one tower of the deepSpeech model.
+                    # This function constructs the entire deepSpeech model
+                    # but shares the variables across all towers.
+                    loss = tower_loss(scope, feats[i], labels[i], seq_lens[i])
 
-                # Reuse variables for the next tower.
-                tf.get_variable_scope().reuse_variables()
+                    # Reuse variables for the next tower.
+                    tf.get_variable_scope().reuse_variables()
 
-                # Retain the summaries from the final tower.
-                summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
+                    # Retain the summaries from the final tower.
+                    summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
 
-                # Calculate the gradients for the batch of
-                # data on this tower.
-                grads_and_vars = optimizer.compute_gradients(loss)
+                    # Calculate the gradients for the batch of
+                    # data on this tower.
+                    grads_and_vars = optimizer.compute_gradients(loss)
 
-                # Keep track of the gradients across all towers.
-                tower_grads.append(grads_and_vars)
+                    # Keep track of the gradients across all towers.
+                    tower_grads.append(grads_and_vars)
 
     return loss, tower_grads, summaries
 
@@ -290,7 +292,7 @@ def get_loss_grads(data, optimizer):
 def run_train_loop(sess, operations, saver):
     """ Train the model for required number of steps."""
     (train_op, loss_op, summary_op) = operations
-    summary_writer = tf.train.SummaryWriter(ARGS.train_dir, sess.graph)
+    summary_writer = tf.summary.FileWriter(ARGS.train_dir, sess.graph)
 
     # Evaluate the ops for max_steps
     for step in range(ARGS.max_steps):
@@ -340,19 +342,19 @@ def add_summaries(summaries, learning_rate, grads):
     """ Add summary ops"""
 
     # Track quantities for Tensorboard display
-    summaries.append(tf.scalar_summary('learning_rate', learning_rate))
+    summaries.append(tf.summary.scalar('learning_rate', learning_rate))
     # Add histograms for gradients.
     for grad, var in grads:
         if grad is not None:
             summaries.append(
-                tf.histogram_summary(var.op.name +
+                tf.summary.histogram(var.op.name +
                                      '/gradients', grad))
     # Add histograms for trainable variables.
     for var in tf.trainable_variables():
-        summaries.append(tf.histogram_summary(var.op.name, var))
+        summaries.append(tf.summary.histogram(var.op.name, var))
 
     # Build the summary operation from the last tower summaries.
-    summary_op = tf.merge_summary(summaries)
+    summary_op = tf.summary.merge(summaries)
     return summary_op
 
 

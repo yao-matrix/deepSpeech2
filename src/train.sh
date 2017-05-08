@@ -9,8 +9,8 @@ export PYTHONPATH=${cur_path}:$PYTHONPATH
 
 
 echo "Training on utterances in order sorted by length"
-# export CUDA_VISIBLE_DEVICES=0,1
-python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 280 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --train_dir ../models/librispeech_1 --use_fp32 --data_dir ../data/LibriSpeech/processed
+#export CUDA_VISIBLE_DEVICES=0,1
+python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 280 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --train_dir ../models/librispeech_1 --data_dir ../data/LibriSpeech/processed --use_fp32
 
 # clear
 # echo "-----------------------------------"
