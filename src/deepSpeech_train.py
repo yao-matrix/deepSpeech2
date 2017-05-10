@@ -143,11 +143,7 @@ def tower_loss(scope, feats, labels, seq_lens):
 
     # Build the portion of the Graph calculating the losses. Note that we will
     # assemble the total_loss using a custom function below.
-    strided_seq_lens = tf.div(tf.subtract(seq_lens, 20), 2)
-    strided_seq_lens = tf.add(strided_seq_lens, 1)
-    strided_seq_lens = tf.div(tf.subtract(strided_seq_lens, 10), 2)
-    strided_seq_lens = tf.add(strided_seq_lens, 1)
-    _ = deepSpeech.loss(logits, labels, strided_seq_lens)
+    _ = deepSpeech.loss(logits, labels, seq_lens)
 
     # Assemble all of the losses for the current tower only.
     losses = tf.get_collection('losses', scope)

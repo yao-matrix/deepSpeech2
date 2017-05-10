@@ -35,6 +35,14 @@ NUM_PER_EPOCH_FOR_EVAL = deepSpeech_input.NUM_PER_EPOCH_FOR_EVAL
 NUM_PER_EPOCH_FOR_TEST = deepSpeech_input.NUM_PER_EPOCH_FOR_TEST
 
 
+def get_rnn_seqlen(seq_lens):
+    rnn_seq_lens = tf.div(tf.subtract(seq_lens, 20), 2)
+    rnn_seq_lens = tf.add(rnn_seq_lens, 1)
+    rnn_seq_lens = tf.div(tf.subtract(rnn_seq_lens, 10), 2)
+    rnn_seq_lens = tf.add(rnn_seq_lens, 1)
+    return rnn_seq_lens
+
+
 def inputs(eval_data, data_dir, batch_size, use_fp16, shuffle):
     """Construct input for LibriSpeech model evaluation using the Reader ops.
 
@@ -162,17 +170,17 @@ def inference(feats, seq_lens, params):
             use_fp16 = params.use_fp16)
         multi_cell = tf.contrib.rnn.MultiRNNCell([cell] * params.num_rnn_layers)
 
-        seq_lens = tf.div(seq_lens, params.temporal_stride)
+        rnn_seq_lens = get_rnn_seqlen(seq_lens)
         if params.rnn_type == 'uni-dir':
             rnn_outputs, _ = tf.nn.dynamic_rnn(multi_cell, rnn_input,
-                                               sequence_length = seq_lens,
+                                               sequence_length = rnn_seq_lens,
                                                dtype = dtype, time_major = True,
                                                scope = scope.name,
                                                swap_memory = True)
         else:
             outputs, _ = tf.nn.bidirectional_dynamic_rnn(
                 multi_cell, multi_cell, rnn_input,
-                sequence_length = seq_lens, dtype = dtype,
+                sequence_length = rnn_seq_lens, dtype = dtype,
                 time_major = True, scope = scope.name,
                 swap_memory = True)
             outputs_fw, outputs_bw = outputs
@@ -213,7 +221,9 @@ def loss(logits, labels, seq_lens):
     logits_shape = logits.get_shape().as_list()
     print "logits shape: ", logits_shape
 
-    print "seq len: ", seq_lens
+    print "seq len[before]: ", seq_lens
+    seq_lens = get_rnn_seqlen(seq_lens)
+    print "seq len[after]: ", seq_lens
 
     # Calculate the average ctc loss across the batch.
     ctc_loss = tf.nn.ctc_loss(labels = labels, inputs = tf.cast(logits, tf.float32), sequence_length = seq_lens, preprocess_collapse_repeated = True, time_major = True)

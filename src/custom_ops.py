@@ -15,7 +15,7 @@ import tensorflow as tf
 from helper_routines import _variable_on_cpu
 
 class CustomRNNCell(BasicRNNCell):
-    """ This is a custoRNNCell that allows the weights
+    """ This is a customRNNCell that allows the weights
     to be re-used on multiple devices. In particular, the Matrix of weights is
     set using _variable_on_cpu.
     The default version of the BasicRNNCell, did not support the ability to
@@ -37,7 +37,7 @@ class CustomRNNCell(BasicRNNCell):
 
 
 class CustomRNNCell2(BasicRNNCell):
-    """ This is a custoRNNCell2 that allows the weights
+    """ This is a customRNNCell2 that allows the weights
     to be re-used on multiple devices. In particular, the Matrix of weights is
     set using _variable_on_cpu.
     The default version of the BasicRNNCell, did not support the ability to
@@ -50,20 +50,28 @@ class CustomRNNCell2(BasicRNNCell):
 
     def __call__(self, inputs, state, scope = None):
         """Most basic RNN:
-        output = new_state = activation(BN(W * input) + U * state + B)."""
+        output = new_state = activation(BN(W * input) + U * state + B).
+         state dim: seq_len * num_units
+         input dim: batch_size * feature_size
+         W: feature_size * num_units
+         U: num_units * num_units
+        """
         with vs.variable_scope(scope or type(self).__name__):
+            # print "rnn cell input size: ", inputs.get_shape().as_list()
+            # print "rnn cell state size: ", state.get_shape().as_list()
             wsize = inputs.get_shape().as_list()[1]
             w = _variable_on_cpu('W', [wsize, self._num_units], use_fp16 = self.use_fp16)
             resi = math_ops.matmul(inputs, w)
-            
-            #bn_resi = batch_norm(resi, n_out = 1760)
+            # batch_size * num_units
+
+            bn_resi = seq_batch_norm(resi, n_out = self._num_units)
             usize = state.get_shape().as_list()[1]
             u = _variable_on_cpu('U', [usize, self._num_units], use_fp16 = self.use_fp16)
             resu = math_ops.matmul(state, u)
             bias = _variable_on_cpu('B', [self._num_units],
                                      tf.constant_initializer(0),
                                      use_fp16 = self.use_fp16)
-            output = relux(tf.add(resi, resu) + bias, capping = 20)
+            output = relux(tf.add(bn_resi, resu) + bias, capping = 20)
         return output, output
 
 
@@ -89,7 +97,26 @@ def batch_norm(x, n_out, scope = None, is_train = True):
         if is_train:
             mean, var = mean_var_with_update()
         else:
-            mean, var = lambda:(ema.average(batch_mean), ema.average(batch_var))
+            mean, var = lambda : (ema.average(batch_mean), ema.average(batch_var))
+        normed = tf.nn.batch_normalization(x, mean, var, beta, gamma, 1e-5)
+    return normed
+
+
+def seq_batch_norm(x, n_out, scope = None, is_train = True):
+    """sequence batch normalization"""
+    with tf.variable_scope(scope or 'sbn'):
+        beta = _variable_on_cpu('beta', [n_out], initializer = tf.zeros_initializer())
+        gamma = _variable_on_cpu('gamma', [n_out], initializer = tf.ones_initializer())
+        batch_mean, batch_var = tf.nn.moments(x, [0], name = 'moments')
+        ema = tf.train.ExponentialMovingAverage(decay = 0.5)
+        def mean_var_with_update():
+            ema_apply_op = ema.apply([batch_mean, batch_var])
+            with tf.control_dependencies([ema_apply_op]):
+                return tf.identity(batch_mean), tf.identity(batch_var)
+        if is_train:
+            mean, var = mean_var_with_update()
+        else:
+            mean, var = lambda : (ema.average(batch_mean), ema.average(batch_var))
         normed = tf.nn.batch_normalization(x, mean, var, beta, gamma, 1e-5)
     return normed
 
