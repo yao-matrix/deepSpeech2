@@ -56,7 +56,7 @@ def _generate_feats_and_label_batch(filename_queue, batch_size):
         batch_size = batch_size,
         bucket_boundaries = list(range(100, 1900, 100)),
         allow_smaller_final_batch = False,
-        num_threads = 1,
+        num_threads = 16,
         dynamic_pad = True)
 
     return feats, tf.cast(labels, tf.int32), seq_len
@@ -79,6 +79,7 @@ def inputs(eval_data, data_dir, batch_size, shuffle = False):
         num_files = len(glob.glob(os.path.join(data_dir, 'train*/*.tfrecords')))
         filenames = [os.path.join(data_dir, 'train-clean-100/train_' + str(i) + '.tfrecords')
                      for i in range(1, num_files + 1)]
+        print filenames
     elif eval_data == 'val':
         filenames = glob.glob(os.path.join(data_dir, 'dev*/*.tfrecords'))
 

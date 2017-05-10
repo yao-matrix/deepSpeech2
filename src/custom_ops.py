@@ -75,9 +75,9 @@ def relux(x, capping = None):
     return y
 
 
-def batch_norm(x, n_out, is_train = True):
+def batch_norm(x, n_out, scope = None, is_train = True):
     """batch normalization"""
-    with tf.variable_scope('bn'):
+    with tf.variable_scope(scope or 'bn'):
         beta = _variable_on_cpu('beta', [n_out], initializer = tf.zeros_initializer())
         gamma = _variable_on_cpu('gamma', [n_out], initializer = tf.ones_initializer())
         batch_mean, batch_var = tf.nn.moments(x, [0, 1, 2], name = 'moments')

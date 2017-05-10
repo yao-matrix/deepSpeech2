@@ -39,6 +39,7 @@ import tensorflow as tf
 from tensorflow.python.client import device_lib
 import deepSpeech
 import helper_routines
+from tensorflow.python import debug as tf_debug
 
 
 def parse_args():
@@ -103,7 +104,7 @@ def parse_args():
     # Read architecture hyper-parameters from checkpoint file
     # if one is provided.
     if args.checkpoint is not None:
-        param_file = args.checkpoint + '/deepSpeech_parameters.json'
+        param_file = os.path.join(args.checkpoint, 'deepSpeech_parameters.json')
         with open(param_file, 'r') as file:
             params = json.load(file)
             # Read network architecture parameters from previously saved
@@ -142,7 +143,10 @@ def tower_loss(scope, feats, labels, seq_lens):
 
     # Build the portion of the Graph calculating the losses. Note that we will
     # assemble the total_loss using a custom function below.
-    strided_seq_lens = tf.div(seq_lens, ARGS.temporal_stride)
+    strided_seq_lens = tf.div(tf.subtract(seq_lens, 20), 2)
+    strided_seq_lens = tf.add(strided_seq_lens, 1)
+    strided_seq_lens = tf.div(tf.subtract(strided_seq_lens, 10), 2)
+    strided_seq_lens = tf.add(strided_seq_lens, 1)
     _ = deepSpeech.loss(logits, labels, strided_seq_lens)
 
     # Assemble all of the losses for the current tower only.
@@ -263,7 +267,7 @@ def get_loss_grads(data, optimizer):
     # Calculate the gradients for each model tower.
     [feats, labels, seq_lens] = data
     tower_grads = []
-    with tf.variable_scope(tf.get_variable_scope()) as scope:
+    with tf.variable_scope(tf.get_variable_scope()) as vscope:
         for i in range(ARGS.num_gpus):
             with tf.device('/gpu:%d' % i):
                 name_scope = '%s_%d' % (helper_routines.TOWER_NAME, i)
@@ -399,20 +403,24 @@ def train():
         summary_op = add_summaries(summaries, learning_rate, grads)
 
         # Create a saver.
-        saver = tf.train.Saver(tf.all_variables(), max_to_keep = 100)
+        saver = tf.train.Saver(tf.global_variables(), max_to_keep = 100)
 
         # Start running operations on the Graph. allow_soft_placement
         # must be set to True to build towers on GPU, as some of the
         # ops do not have GPU implementations.
-        sess = tf.Session(config=tf.ConfigProto(
+        sess = tf.Session(config = tf.ConfigProto(
             allow_soft_placement = True,
             log_device_placement = ARGS.log_device_placement))
+        # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
+        # sess.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
 
         # Initialize vars.
         if ARGS.checkpoint is not None:
+            print "has checkpoint"
             global_step = initialize_from_checkpoint(sess, saver)
         else:
-            sess.run(tf.initialize_all_variables())
+            print "does not have checkpoint"
+            sess.run(tf.global_variables_initializer())
 
         # Start the queue runners.
         tf.train.start_queue_runners(sess)

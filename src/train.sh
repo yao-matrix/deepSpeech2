@@ -8,16 +8,18 @@ export PYTHONPATH=${cur_path}:$PYTHONPATH
 # echo $PYTHONPATH
 
 
-echo "Training on utterances in order sorted by length"
+# echo "Training on utterances in order sorted by length"
 #export CUDA_VISIBLE_DEVICES=0,1
-python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 280 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --train_dir ../models/librispeech_1 --data_dir ../data/LibriSpeech/processed --use_fp32
+filename='../models/librispeech/train'
+datadir='../data/LibriSpeech/processed/'
+# python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 280 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --train_dir $filename --data_dir $datadir --use_fp32
 
-# clear
-# echo "-----------------------------------"
-# echo "Training now on shuffled utterances"
-# filename='../models/librispeech/train'
-# datadir='../data/librispeech/processed/'
-# python deepSpeech_train.py --batch_size 32 --shuffle --max_steps 40000 --checkpoint ../models/librispeech_1 --train_dir $filename --data_dir datadir
+clear
+echo "-----------------------------------"
+echo "Training now on shuffled utterances"
+filename='../models/librispeech/train'
+datadir='../data/LibriSpeech/processed/'
+python deepSpeech_train.py --batch_size 32 --shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --train_dir $filename --data_dir $datadir
 
 # clear
 # echo "-----------------------------------"

@@ -88,6 +88,7 @@ def inference(feats, seq_lens, params):
 
     feat_len = feats.get_shape().as_list()[-1]
     # data layout: N, T, F
+    print feats.get_shape().as_list()
 
     #########################
     #  convolutional layers
@@ -150,7 +151,7 @@ def inference(feats, seq_lens, params):
         rnn_input = tf.transpose(rnn_input, perm = [1, 0, 2])
         # Make one instance of cell on a fixed device,
         # and use copies of the weights on other devices.
-        cell = custom_ops.CustomRNNCell(
+        cell = custom_ops.CustomRNNCell2(
             params.num_hidden,
             use_fp16 = params.use_fp16)
         multi_cell = tf.contrib.rnn.MultiRNNCell([cell] * params.num_rnn_layers)
@@ -160,13 +161,13 @@ def inference(feats, seq_lens, params):
             rnn_outputs, _ = tf.nn.dynamic_rnn(multi_cell, rnn_input,
                                                sequence_length = seq_lens,
                                                dtype = dtype, time_major = True,
-                                               scope = 'rnn',
+                                               scope = scope.name,
                                                swap_memory = True)
         else:
             outputs, _ = tf.nn.bidirectional_dynamic_rnn(
                 multi_cell, multi_cell, rnn_input,
                 sequence_length = seq_lens, dtype = dtype,
-                time_major = True, scope = 'rnn',
+                time_major = True, scope = scope.name,
                 swap_memory = True)
             outputs_fw, outputs_bw = outputs
             rnn_outputs = outputs_fw + outputs_bw
@@ -203,11 +204,13 @@ def loss(logits, labels, seq_lens):
     Returns:
       Loss tensor of type float.
     """
-    xxx = logits.get_shape().as_list()
-    print xxx
+    logits_shape = logits.get_shape().as_list()
+    print "logits shape: ", logits_shape
+
+    print "seq len: ", seq_lens
 
     # Calculate the average ctc loss across the batch.
-    ctc_loss = tf.nn.ctc_loss(labels = labels, inputs = tf.cast(logits, tf.float32), sequence_length = seq_lens)
+    ctc_loss = tf.nn.ctc_loss(labels = labels, inputs = tf.cast(logits, tf.float32), sequence_length = seq_lens, preprocess_collapse_repeated = True, time_major = True)
     ctc_loss_mean = tf.reduce_mean(ctc_loss, name = 'ctc_loss')
     tf.add_to_collection('losses', ctc_loss_mean)
 
