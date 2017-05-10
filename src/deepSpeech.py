@@ -22,6 +22,7 @@ Summary of major functions:
 
 import tensorflow as tf
 import deepSpeech_input
+import deepSpeech_dummy
 import custom_ops
 from helper_routines import _variable_on_cpu
 from helper_routines import _variable_with_weight_decay
@@ -53,7 +54,12 @@ def inputs(eval_data, data_dir, batch_size, use_fp16, shuffle):
       ValueError: If no data_dir
     """
     if not data_dir:
-        raise ValueError('Please supply a data_dir')
+        # raise ValueError('Please supply a data_dir')
+        print 'Using dummy input'
+        feats, labels, seq_lens = deepSpeech_dummy.inputs(eval_data = eval_data,
+                                                          data_dir = data_dir,
+                                                          batch_size = batch_size,
+                                                          shuffle = shuffle)
     else:
         feats, labels, seq_lens = deepSpeech_input.inputs(eval_data = eval_data,
                                                           data_dir = data_dir,
