@@ -3,9 +3,9 @@ import numpy as np
 import tensorflow as tf
 
 
-utt_lengths = [ 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500 ]
-counts = [ 3, 10, 11, 13, 14, 13, 9, 8, 5, 4, 3, 2, 2, 2, 1 ]
-label_lengths = [ 7, 17, 35, 48, 62, 78, 93, 107, 120, 134, 148, 163, 178, 193, 209 ]
+utt_lengths = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500]
+counts = [3, 10, 11, 13, 14, 13, 9, 8, 5, 4, 3, 2, 2, 2, 1]
+label_lengths = [7, 17, 35, 48, 62, 78, 93, 107, 120, 134, 148, 163, 178, 193, 209]
 
 freq_bins = 161
 # scale_factor = 10 * 128
@@ -79,8 +79,9 @@ def _next(batch_size):
 
         g_current = g_current + inc
         label = range(label_length)
-        for x in range(label_length):
-            label[x] = random.randint(0, NUM_CLASSES - 1)
+        for x in range(label_length - 1):
+            label[x] = random.randint(0, NUM_CLASSES - 2)
+        label[label_length - 1] = NUM_CLASSES - 1
         feat = g_randomness[start_idx : end_idx, :]
         # print input.shape
         # print utt_length
