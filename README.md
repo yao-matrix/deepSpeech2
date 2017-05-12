@@ -7,7 +7,7 @@ This software is released under a BSD license. The license to this software does
 
 Pre-requisites
 -------------
-* TensorFlow - version: r0.11
+* TensorFlow - version: 1.1.0
 * python-levenshtein - to compute Character-Error-Rate
 * python_speech_features - to generate mfcc features
 * PySoundFile - to read FLAC files

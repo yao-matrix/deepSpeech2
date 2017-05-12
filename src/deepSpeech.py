@@ -36,10 +36,15 @@ NUM_PER_EPOCH_FOR_TEST = deepSpeech_input.NUM_PER_EPOCH_FOR_TEST
 
 
 def get_rnn_seqlen(seq_lens):
-    rnn_seq_lens = tf.div(tf.subtract(seq_lens, 20), 2)
-    rnn_seq_lens = tf.add(rnn_seq_lens, 1)
-    rnn_seq_lens = tf.div(tf.subtract(rnn_seq_lens, 10), 2)
-    rnn_seq_lens = tf.add(rnn_seq_lens, 1)
+    # seq_lens = tf.Print(seq_lens, [seq_lens], "Original seq len: ", 32)
+    seq_lens = tf.cast(seq_lens, tf.float64)
+    rnn_seq_lens = tf.div(tf.subtract(seq_lens, 19), 2.0)
+    rnn_seq_lens = tf.ceil(rnn_seq_lens)
+    rnn_seq_lens = tf.div(tf.subtract(rnn_seq_lens, 9), 2.0)
+    rnn_seq_lens = tf.ceil(rnn_seq_lens)
+    rnn_seq_lens = tf.cast(rnn_seq_lens, tf.int32)
+    # rnn_seq_lens = tf.Print(rnn_seq_lens, [rnn_seq_lens], "Conved seq len: ", 32)
+    # print "rnn_seq_lens shape: ", rnn_seq_lens.get_shape().as_list()
     return rnn_seq_lens
 
 
@@ -62,13 +67,13 @@ def inputs(eval_data, data_dir, batch_size, use_fp16, shuffle):
       ValueError: If no data_dir
     """
     if not data_dir:
-        # raise ValueError('Please supply a data_dir')
-        print 'Using dummy input'
+        print 'Using dummy data'
         feats, labels, seq_lens = deepSpeech_dummy.inputs(eval_data = eval_data,
                                                           data_dir = data_dir,
                                                           batch_size = batch_size,
                                                           shuffle = shuffle)
     else:
+        print 'Using Libri data'
         feats, labels, seq_lens = deepSpeech_input.inputs(eval_data = eval_data,
                                                           data_dir = data_dir,
                                                           batch_size = batch_size,
@@ -102,7 +107,7 @@ def inference(feats, seq_lens, params):
 
     feat_len = feats.get_shape().as_list()[-1]
     # data layout: N, T, F
-    print feats.get_shape().as_list()
+    # print "feat shape: ", feats.get_shape().as_list()
 
     #########################
     #  convolutional layers
@@ -219,11 +224,11 @@ def loss(logits, labels, seq_lens):
       Loss tensor of type float.
     """
     logits_shape = logits.get_shape().as_list()
-    print "logits shape: ", logits_shape
+    # print "logits shape: ", logits_shape
 
-    print "seq len[before]: ", seq_lens
+    # print "seq len[before]: ", seq_lens
     seq_lens = get_rnn_seqlen(seq_lens)
-    print "seq len[after]: ", seq_lens
+    # print "seq len[after]: ", seq_lens
 
     # Calculate the average ctc loss across the batch.
     ctc_loss = tf.nn.ctc_loss(labels = labels, inputs = tf.cast(logits, tf.float32), sequence_length = seq_lens, preprocess_collapse_repeated = True, time_major = True)

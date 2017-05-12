@@ -12,8 +12,8 @@ export PYTHONPATH=${cur_path}:$PYTHONPATH
 
 # echo "Training on utterances in order sorted by length"
 #export CUDA_VISIBLE_DEVICES=0,1
-filename='../models/librispeech/train'
-datadir='../data/LibriSpeech/processed/'
+# filename='../models/librispeech/train'
+# datadir='../data/LibriSpeech/processed/'
 # python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 280 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --train_dir $filename --data_dir $datadir --use_fp32
 
 clear
@@ -21,11 +21,11 @@ echo "-----------------------------------"
 echo "Training now on shuffled utterances"
 
 if [ $# -eq 0 ];then
-filename='../models/librispeech/train'
-datadir='../data/LibriSpeech/processed/'
-python deepSpeech_train.py --batch_size 32 --shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --train_dir $filename --data_dir $datadir --num_gpus 1
+	filename='../models/librispeech/train'
+	datadir='../data/LibriSpeech/processed/'
+	python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --train_dir $filename --data_dir $datadir --num_gpus 1
 else
-python deepSpeech_train.py --batch_size 32 --shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --num_gpus 1 
+	python deepSpeech_train.py --batch_size 32 --shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --num_gpus 1 
 fi
 
 # clear
