@@ -37,10 +37,12 @@ import json
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.client import device_lib
+from tensorflow.python.client import timeline
 import deepSpeech
 import helper_routines
 from tensorflow.python import debug as tf_debug
 
+DEBUG = False
 
 def parse_args():
     " Parses command line arguments."
@@ -294,10 +296,18 @@ def run_train_loop(sess, operations, saver):
     (train_op, loss_op, summary_op) = operations
     summary_writer = tf.summary.FileWriter(ARGS.train_dir, sess.graph)
 
+    if DEBUG:
+        run_options = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
+        run_metadata = tf.RunMetadata()
+        trace_file = open('profiling.json', 'w')
+
     # Evaluate the ops for max_steps
     for step in range(ARGS.max_steps):
         start_time = time.time()
-        _, loss_value = sess.run([train_op, loss_op])
+        if DEBUG:
+            _, loss_value = sess.run([train_op, loss_op], options = run_options, run_metadata = run_metadata)
+        else:
+            _, loss_value = sess.run([train_op, loss_op])
         duration = time.time() - start_time
         assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
 
@@ -317,7 +327,18 @@ def run_train_loop(sess, operations, saver):
         # Save the model checkpoint periodically.
         if step % 100 == 0 or (step + 1) == ARGS.max_steps:
             checkpoint_path = os.path.join(ARGS.train_dir, 'model.ckpt')
-            saver.save(sess, checkpoint_path, global_step=step)
+            saver.save(sess, checkpoint_path, global_step = step)
+
+        if DEBUG and step == 10:
+            trace = timeline.Timeline(run_metadata.step_stats)
+            trace_file.write(trace.generate_chrome_trace_format())
+
+            tf.contrib.tfprof.model_analyzer.print_model_analyzer(tf.get_default_graph(),
+                                                                  tfprof_options = tf.contrib.tfprof.model_analyzer.FLOAT_OPS_OPTIONS)
+
+            tf.contrib.tfprof.model_analyzer.print_model_analyzer(tf.get_default_graph(),
+                                                                  run_meta = run_metadata,
+                                                                  tfprof_options = tf.contrib.tfprof.model_analyzer.PRINT_ALL_TIMING_MOMORY)
 
 
 def initialize_from_checkpoint(sess, saver):
