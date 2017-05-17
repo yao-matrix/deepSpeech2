@@ -5,11 +5,7 @@ variables are re-used between devices.
 """
 
 from tensorflow.contrib.rnn import BasicRNNCell
-from tensorflow.python.ops.math_ops import tanh
-from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.util import nest
-from tensorflow.python.ops import math_ops
-from tensorflow.python.ops import array_ops
 import tensorflow as tf
 
 from helper_routines import _variable_on_cpu
@@ -30,7 +26,7 @@ class CustomRNNCell(BasicRNNCell):
     def __call__(self, inputs, state, scope = None):
         """Most basic RNN:
         output = new_state = activation(W * input + U * state + B)."""
-        with vs.variable_scope(scope or type(self).__name__):
+        with tf.variable_scope(scope or type(self).__name__):
             output = self._activation(_linear([inputs, state], self._num_units,
                                               True, use_fp16 = self.use_fp16))
         return output, output
@@ -56,18 +52,17 @@ class CustomRNNCell2(BasicRNNCell):
          W: feature_size * num_units
          U: num_units * num_units
         """
-        with vs.variable_scope(scope or type(self).__name__):
+        with tf.variable_scope(scope or type(self).__name__):
             # print "rnn cell input size: ", inputs.get_shape().as_list()
             # print "rnn cell state size: ", state.get_shape().as_list()
             wsize = inputs.get_shape().as_list()[1]
-            w = _variable_on_cpu('W', [wsize, self._num_units], use_fp16 = self.use_fp16)
-            resi = math_ops.matmul(inputs, w)
+            w = _variable_on_cpu('W', [self._num_units, wsize], use_fp16 = self.use_fp16)
+            resi = tf.matmul(inputs, w, transpose_a = False, transpose_b = True)
             # batch_size * num_units
-
             bn_resi = seq_batch_norm(resi, n_out = self._num_units)
             usize = state.get_shape().as_list()[1]
-            u = _variable_on_cpu('U', [usize, self._num_units], use_fp16 = self.use_fp16)
-            resu = math_ops.matmul(state, u)
+            u = _variable_on_cpu('U', [self._num_units, usize], use_fp16 = self.use_fp16)
+            resu = tf.matmul(state, u, transpose_a = False, transpose_b = True)
             bias = _variable_on_cpu('B', [self._num_units],
                                      tf.constant_initializer(0),
                                      use_fp16 = self.use_fp16)
@@ -159,7 +154,7 @@ def _linear(args, output_size, bias, scope = None, use_fp16 = False):
     dtype = [a.dtype for a in args][0]
 
     # Now the computation.
-    with vs.variable_scope(scope or "Linear"):
+    with tf.variable_scope(scope or "Linear"):
         matrix = _variable_on_cpu('Matrix', [total_arg_size, output_size],
                                   use_fp16 = use_fp16)
         if use_fp16:
@@ -168,9 +163,9 @@ def _linear(args, output_size, bias, scope = None, use_fp16 = False):
             dtype = tf.float32
         args = [tf.cast(x, dtype) for x in args]
         if len(args) == 1:
-            res = math_ops.matmul(args[0], matrix)
+            res = tf.matmul(args[0], matrix, transpose_a = False, transpose_b = True)
         else:
-            res = math_ops.matmul(array_ops.concat(args, 1), matrix)
+            res = tf.matmul(tf.concat(args, 1), matrix, transpose_a = False, transpose_b = True)
         if not bias:
             return res
         bias_term = _variable_on_cpu('Bias', [output_size],

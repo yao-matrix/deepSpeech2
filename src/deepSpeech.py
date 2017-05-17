@@ -195,14 +195,14 @@ def inference(feats, seq_lens, params):
     # Linear layer(WX + b) - softmax is applied by CTC cost function.
     with tf.variable_scope('softmax_linear') as scope:
         weights = _variable_with_weight_decay(
-            'weights', [params.num_hidden, NUM_CLASSES],
+            'weights', [NUM_CLASSES, params.num_hidden],
             wd_value = None,
             use_fp16 = params.use_fp16)
         biases = _variable_on_cpu('biases', [NUM_CLASSES],
                                   tf.constant_initializer(0.0),
                                   params.use_fp16)
         logit_inputs = tf.reshape(rnn_outputs, [-1, cell.output_size])
-        logits = tf.add(tf.matmul(logit_inputs, weights),
+        logits = tf.add(tf.matmul(logit_inputs, weights, transpose_a = False, transpose_b = True),
                         biases, name = scope.name)
         logits = tf.reshape(logits, [-1, params.batch_size, NUM_CLASSES])
         _activation_summary(logits)

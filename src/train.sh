@@ -6,10 +6,12 @@
 clear
 cur_dir=$(cd "$(dirname $0)";pwd)
 echo ${cur_dir}
-export PYTHONPATH=${cur_path}:$PYTHONPATH
+export PYTHONPATH=${cur_path}:/home/matrix/inteltf/:$PYTHONPATH
 # echo $PYTHONPATH
-
 export LD_LIBRARY_PATH=/usr/local/cuda/extras/CUPTI/lib64/:$LD_LIBRARY_PATH
+
+# activate Intel Python
+# source /opt/intel/intelpython2/bin/activate
 
 # echo "Training on utterances in order sorted by length"
 #export CUDA_VISIBLE_DEVICES=0,1

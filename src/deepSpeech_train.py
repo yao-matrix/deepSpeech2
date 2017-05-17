@@ -1,5 +1,8 @@
 # Author: Lakshmi Krishnan
 # Email: lkrishn7@ford.com
+# Author: YAO MAtrix
+# Email: yaoweifeng0301@126.com
+
 
 """A script to train a deepSpeech model on LibriSpeech data using multiple GPUs
 with synchronous updates (data parallel training).
@@ -34,6 +37,7 @@ import re
 import time
 import argparse
 import json
+import sys
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.client import device_lib
@@ -41,6 +45,11 @@ from tensorflow.python.client import timeline
 import deepSpeech
 import helper_routines
 from tensorflow.python import debug as tf_debug
+
+from setenvs import setenvs
+from setenvs import arglist
+args = arglist()
+
 
 DEBUG = False
 
@@ -100,6 +109,12 @@ def parse_args():
                         help = 'Epochs after which learning rate decays')
     parser.add_argument('--lr_decay_factor', type = float, default = 0.9,
                         help = 'Learning rate decay factor')
+    parser.add_argument('--intra_op', type = int, default = 44,
+                        help = 'Intra op thread num')
+    parser.add_argument('--inter_op', type = int, default = 1,
+                        help = 'Inter op thread num')
+ 
+
 
     args = parser.parse_args()
 
@@ -427,7 +442,9 @@ def train():
         # ops do not have GPU implementations.
         sess = tf.Session(config = tf.ConfigProto(
             allow_soft_placement = True,
-            log_device_placement = ARGS.log_device_placement))
+            log_device_placement = ARGS.log_device_placement,
+            inter_op_parallelism_threads = ARGS.inter_op,
+            intra_op_parallelism_threads = ARGS.intra_op))
         # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
         # sess.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
 
@@ -460,6 +477,20 @@ def main():
     with open(os.path.join(ARGS.train_dir,
                            'deepSpeech_parameters.json'), 'w') as outfile:
         json.dump(vars(ARGS), outfile, sort_keys=True, indent=4)
+    
+    args = setenvs(sys.argv)
+    print('Running on CPU: ', args.cpu)
+  
+    if args.cpu == 'bdw':
+        ARGS.intra_op = 44
+        ARGS.inter_op = 1
+    elif args.cpu == 'knl':
+        ARGS.intra_op = 272
+        ARGS.inter_op = 2
+
+    print('Running inter_op :', ARGS.inter_op)
+    print('Running intra_op :', ARGS.intra_op)
+ 
     train()
 
 if __name__ == '__main__':
