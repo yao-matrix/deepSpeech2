@@ -21,9 +21,12 @@ Summary of major functions:
 
 
 import tensorflow as tf
+
 import deepSpeech_input
 import deepSpeech_dummy
+
 import custom_ops
+
 from helper_routines import _variable_on_cpu
 from helper_routines import _variable_with_weight_decay
 from helper_routines import _activation_summary
@@ -119,19 +122,20 @@ def inference(feats, seq_lens, params):
             shape = [20, 5, 1, params.num_filters],
             wd_value = None, use_fp16 = params.use_fp16)
 
-        ## N. T, F
-        feats = tf.expand_dims(feats, dim = -1)
-        ## N, T, F, 1
+        ## N, T, F
+        feats = tf.expand_dims(feats, axis = 1)
+        ## N, 1, T, F
         conv = tf.nn.conv2d(feats, kernel,
-                            [1, 2, 2, 1],
-                            padding = 'VALID')
+                            strides = [1, 1, 2, 2],
+                            padding = 'VALID',
+                            data_format = 'NCHW')
         biases = _variable_on_cpu('biases', [params.num_filters],
                                   tf.constant_initializer(-0.05),
                                   params.use_fp16)
-        bias = tf.nn.bias_add(conv, biases)
-        ## N, T, F, 32
+        bias = tf.nn.bias_add(conv, biases, data_format = 'NCHW')
+        ## N, 32, T, F
         # batch normalization
-        bn = custom_ops.batch_norm(bias)
+        bn = custom_ops.batch_norm2(bias, data_format = 'NCHW')
 
         # clipped ReLU
         conv1 = custom_ops.relux(bn, capping = 20)
@@ -144,17 +148,18 @@ def inference(feats, seq_lens, params):
             shape = [10, 5, params.num_filters, params.num_filters],
             wd_value = None, use_fp16 = params.use_fp16)
 
-        ## N. T, F, 32
+        ## N, 32, T, F
         conv = tf.nn.conv2d(conv1, kernel,
-                            [1, 2, 1, 1],
-                            padding = 'VALID')
+                            [1, 1, 2, 1],
+                            padding = 'VALID',
+                            data_format = 'NCHW')
         biases = _variable_on_cpu('biases', [params.num_filters],
                                   tf.constant_initializer(-0.05),
                                   params.use_fp16)
-        bias = tf.nn.bias_add(conv, biases)
-        ## N, T, F, 32
+        bias = tf.nn.bias_add(conv, biases, data_format = 'NCHW')
+        ## N, 32, T, F
         # batch normalization
-        bn = custom_ops.batch_norm(bias)
+        bn = custom_ops.batch_norm2(bias, data_format = 'NCHW')
 
         # clipped ReLU
         conv2 = custom_ops.relux(bn, capping = 20)
@@ -164,6 +169,8 @@ def inference(feats, seq_lens, params):
     # recurrent layers
     ######################
     with tf.variable_scope('rnn') as scope:
+        # to N, T, *
+        rnn_input = tf.transpose(rnn_input, perm = [0, 2, 1, 3])
         # Reshape conv output to fit rnn input: N, T, F * 32
         rnn_input = tf.reshape(conv2, [params.batch_size, -1, 75 * params.num_filters])
         # Permute into time major order for rnn: T, N, F * 32
@@ -195,7 +202,7 @@ def inference(feats, seq_lens, params):
     # Linear layer(WX + b) - softmax is applied by CTC cost function.
     with tf.variable_scope('softmax_linear') as scope:
         weights = _variable_with_weight_decay(
-            'weights', [NUM_CLASSES, params.num_hidden],
+            'weights', [params.num_hidden, NUM_CLASSES],
             wd_value = None,
             use_fp16 = params.use_fp16)
         biases = _variable_on_cpu('biases', [NUM_CLASSES],

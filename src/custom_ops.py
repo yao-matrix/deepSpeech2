@@ -55,12 +55,12 @@ class CustomRNNCell2(BasicRNNCell):
         with tf.variable_scope(scope or type(self).__name__):
             # print "rnn cell input size: ", inputs.get_shape().as_list()
             # print "rnn cell state size: ", state.get_shape().as_list()
-            wsize = inputs.get_shape().as_list()[1]
+            wsize = inputs.get_shape()[1]
             w = _variable_on_cpu('W', [self._num_units, wsize], use_fp16 = self.use_fp16)
             resi = tf.matmul(inputs, w, transpose_a = False, transpose_b = True)
             # batch_size * num_units
-            bn_resi = seq_batch_norm(resi, n_out = self._num_units)
-            usize = state.get_shape().as_list()[1]
+            bn_resi = seq_batch_norm(resi)
+            usize = state.get_shape()[1]
             u = _variable_on_cpu('U', [self._num_units, usize], use_fp16 = self.use_fp16)
             resu = tf.matmul(state, u, transpose_a = False, transpose_b = True)
             bias = _variable_on_cpu('B', [self._num_units],
@@ -78,11 +78,79 @@ def relux(x, capping = None):
     return y
 
 
-def batch_norm(x, n_out, scope = None, is_train = True):
-    """batch normalization"""
+def batch_norm2(inputs,
+               decay = 0.999,
+               center = True,
+               scale = True,
+               epsilon = 0.001,
+               moving_vars = 'moving_vars',
+               activation = None,
+               is_training = True,
+               trainable = True,
+               restore = True,
+               scope = None,
+               reuse = None,
+               data_format = 'NHWC'):
+  """Adds a Batch Normalization layer.
+
+  Args:
+    inputs: a tensor of size [batch_size, height, width, channels]
+            or [batch_size, channels].
+    decay: decay for the moving average.
+    center: If True, subtract beta. If False, beta is not created and ignored.
+    scale: If True, multiply by gamma. If False, gamma is
+      not used. When the next layer is linear (also e.g. ReLU), this can be
+      disabled since the scaling can be done by the next layer.
+    epsilon: small float added to variance to avoid dividing by zero.
+    moving_vars: collection to store the moving_mean and moving_variance.
+    activation: activation function.
+    is_training: whether or not the model is in training mode.
+    trainable: whether or not the variables should be trainable or not.
+    restore: whether or not the variables should be marked for restore.
+    scope: Optional scope for variable_scope.
+    reuse: whether or not the layer and its variables should be reused. To be
+      able to reuse the layer scope must be given.
+
+  Returns:
+    a tensor representing the output of the operation.
+
+  """
+  inputs_shape = inputs.get_shape()
+  with tf.variable_scope(scope, 'BatchNorm', [inputs], reuse = reuse):
+    axis = list(range(len(inputs_shape) - 1))
+    if data_format == 'NCHW':
+      params_shape = inputs_shape[1]
+    else:
+      params_shape = inputs_shape[-1]
+    # Allocate parameters for the beta and gamma of the normalization.
+    beta, gamma = None, None
+    if center:
+      beta = variables.variable('beta',
+                                params_shape,
+                                initializer = tf.zeros_initializer(),
+                                trainable = trainable,
+                                restore = restore)
+    if scale:
+      gamma = variables.variable('gamma',
+                                 params_shape,
+                                 initializer = tf.ones_initializer(),
+                                 trainable = trainable,
+                                 restore = restore)
+    outputs, _, _ = tf.nn.fused_batch_norm(
+        inputs, gamma, beta, mean = None, variance = None, epsilon = epsilon,
+        data_format = data_format, is_training = is_training)
+    outputs.set_shape(inputs.get_shape())
+
+    return outputs
+
+
+def batch_norm(x, scope = None, is_train = True, data_format = None):
+    """batch normalization, currently only work on NHWC"""
     with tf.variable_scope(scope or 'bn'):
-        beta = _variable_on_cpu('beta', [n_out], initializer = tf.zeros_initializer())
-        gamma = _variable_on_cpu('gamma', [n_out], initializer = tf.ones_initializer())
+        inputs_shape = x.get_shape()
+        param_shape = inputs_shape[-1]        
+        beta = _variable_on_cpu('beta', [param_shape], initializer = tf.zeros_initializer())
+        gamma = _variable_on_cpu('gamma', [param_shape], initializer = tf.ones_initializer())
         batch_mean, batch_var = tf.nn.moments(x, [0, 1, 2], name = 'moments')
         ema = tf.train.ExponentialMovingAverage(decay = 0.5)
         def mean_var_with_update():
@@ -97,11 +165,13 @@ def batch_norm(x, n_out, scope = None, is_train = True):
     return normed
 
 
-def seq_batch_norm(x, n_out, scope = None, is_train = True):
-    """sequence batch normalization"""
+def seq_batch_norm(x, scope = None, is_train = True):
+    """sequence batch normalization, input N * D"""
     with tf.variable_scope(scope or 'sbn'):
-        beta = _variable_on_cpu('beta', [n_out], initializer = tf.zeros_initializer())
-        gamma = _variable_on_cpu('gamma', [n_out], initializer = tf.ones_initializer())
+        inputs_shape = x.get_shape()
+        param_shape = inputs_shape[-1]
+        beta = _variable_on_cpu('beta', [param_shape], initializer = tf.zeros_initializer())
+        gamma = _variable_on_cpu('gamma', [param_shape], initializer = tf.ones_initializer())
         batch_mean, batch_var = tf.nn.moments(x, [0], name = 'moments')
         ema = tf.train.ExponentialMovingAverage(decay = 0.5)
         def mean_var_with_update():

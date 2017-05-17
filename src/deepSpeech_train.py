@@ -486,7 +486,7 @@ def main():
         ARGS.inter_op = 1
     elif args.cpu == 'knl':
         ARGS.intra_op = 272
-        ARGS.inter_op = 2
+        ARGS.inter_op = 4
 
     print('Running inter_op :', ARGS.inter_op)
     print('Running intra_op :', ARGS.intra_op)

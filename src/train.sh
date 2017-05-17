@@ -21,15 +21,18 @@ export LD_LIBRARY_PATH=/usr/local/cuda/extras/CUPTI/lib64/:$LD_LIBRARY_PATH
 
 # clear
 echo "-----------------------------------"
-echo "Training now on shuffled utterances"
-
 if [ $# -eq 0 ];then
+	echo "Training now on shuffled utterances"
 	filename='../models/librispeech/train'
 	datadir='../data/LibriSpeech/processed/'
 	python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --train_dir $filename --data_dir $datadir --num_gpus 1
 else
-	python deepSpeech_train.py --batch_size 32 --shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --num_gpus 1 
+	echo "Training now on dummy data"
+	python deepSpeech_train.py --batch_size 32 --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --num_gpus 1 
 fi
+
+# deactivate Intel Python
+# source /opt/intel/intelpython2/bin/deactivate
 
 # clear
 # echo "-----------------------------------"
