@@ -9,6 +9,7 @@ echo ${cur_dir}
 export PYTHONPATH=${cur_path}:$PYTHONPATH
 # echo $PYTHONPATH
 
+export LD_LIBRARY_PATH=/usr/local/cuda/extras/CUPTI/lib64/:$LD_LIBRARY_PATH
 
 # echo "Training on utterances in order sorted by length"
 #export CUDA_VISIBLE_DEVICES=0,1
@@ -16,7 +17,7 @@ export PYTHONPATH=${cur_path}:$PYTHONPATH
 # datadir='../data/LibriSpeech/processed/'
 # python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 280 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --train_dir $filename --data_dir $datadir --use_fp32
 
-clear
+# clear
 echo "-----------------------------------"
 echo "Training now on shuffled utterances"
 

@@ -333,10 +333,10 @@ def run_train_loop(sess, operations, saver):
             trace = timeline.Timeline(run_metadata.step_stats)
             trace_file.write(trace.generate_chrome_trace_format())
 
-            tf.contrib.tfprof.model_analyzer.print_model_analyzer(tf.get_default_graph(),
+            tf.contrib.tfprof.model_analyzer.print_model_analysis(tf.get_default_graph(),
                                                                   tfprof_options = tf.contrib.tfprof.model_analyzer.FLOAT_OPS_OPTIONS)
 
-            tf.contrib.tfprof.model_analyzer.print_model_analyzer(tf.get_default_graph(),
+            tf.contrib.tfprof.model_analyzer.print_model_analysis(tf.get_default_graph(),
                                                                   run_meta = run_metadata,
                                                                   tfprof_options = tf.contrib.tfprof.model_analyzer.PRINT_ALL_TIMING_MOMORY)
 
