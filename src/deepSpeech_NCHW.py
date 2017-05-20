@@ -168,11 +168,12 @@ def inference(feats, seq_lens, params):
     ######################
     # recurrent layers
     ######################
+    # conv2 = tf.Print(conv2, [conv2.get_shape()], "Conved Tensor Shape: ")
     with tf.variable_scope('rnn') as scope:
-        # to N, T, *
-        rnn_input = tf.transpose(rnn_input, perm = [0, 2, 1, 3])
+        # N, C, T, F => N, T, C, F
+        rnn_input = tf.transpose(conv2, perm = [0, 2, 1, 3])
         # Reshape conv output to fit rnn input: N, T, F * 32
-        rnn_input = tf.reshape(conv2, [params.batch_size, -1, 75 * params.num_filters])
+        rnn_input = tf.reshape(rnn_input, [params.batch_size, -1, 75 * params.num_filters])
         # Permute into time major order for rnn: T, N, F * 32
         rnn_input = tf.transpose(rnn_input, perm = [1, 0, 2])
         # Make one instance of cell on a fixed device,
@@ -202,7 +203,7 @@ def inference(feats, seq_lens, params):
     # Linear layer(WX + b) - softmax is applied by CTC cost function.
     with tf.variable_scope('softmax_linear') as scope:
         weights = _variable_with_weight_decay(
-            'weights', [params.num_hidden, NUM_CLASSES],
+            'weights', [NUM_CLASSES, params.num_hidden],
             wd_value = None,
             use_fp16 = params.use_fp16)
         biases = _variable_on_cpu('biases', [NUM_CLASSES],

@@ -42,16 +42,20 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.client import device_lib
 from tensorflow.python.client import timeline
-import deepSpeech
 import helper_routines
 from tensorflow.python import debug as tf_debug
+
+DEBUG = False
+NCHW = True
+
+if NCHW is True:
+  import deepSpeech_NCHW as deepSpeech
+else:
+  import deepSpeech
 
 from setenvs import setenvs
 from setenvs import arglist
 args = arglist()
-
-
-DEBUG = False
 
 def parse_args():
     " Parses command line arguments."

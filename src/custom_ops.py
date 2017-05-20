@@ -87,7 +87,6 @@ def batch_norm2(inputs,
                activation = None,
                is_training = True,
                trainable = True,
-               restore = True,
                scope = None,
                reuse = None,
                data_format = 'NHWC'):
@@ -106,7 +105,6 @@ def batch_norm2(inputs,
     activation: activation function.
     is_training: whether or not the model is in training mode.
     trainable: whether or not the variables should be trainable or not.
-    restore: whether or not the variables should be marked for restore.
     scope: Optional scope for variable_scope.
     reuse: whether or not the layer and its variables should be reused. To be
       able to reuse the layer scope must be given.
@@ -116,7 +114,7 @@ def batch_norm2(inputs,
 
   """
   inputs_shape = inputs.get_shape()
-  with tf.variable_scope(scope, 'BatchNorm', [inputs], reuse = reuse):
+  with tf.variable_scope(scope, 'bn2', [inputs], reuse = reuse):
     axis = list(range(len(inputs_shape) - 1))
     if data_format == 'NCHW':
       params_shape = inputs_shape[1]
@@ -125,17 +123,11 @@ def batch_norm2(inputs,
     # Allocate parameters for the beta and gamma of the normalization.
     beta, gamma = None, None
     if center:
-      beta = variables.variable('beta',
-                                params_shape,
-                                initializer = tf.zeros_initializer(),
-                                trainable = trainable,
-                                restore = restore)
+      beta = _variable_on_cpu('beta', params_shape, initializer = tf.zeros_initializer())
+
     if scale:
-      gamma = variables.variable('gamma',
-                                 params_shape,
-                                 initializer = tf.ones_initializer(),
-                                 trainable = trainable,
-                                 restore = restore)
+      gamma = _variable_on_cpu('gamma', params_shape, initializer = tf.ones_initializer())
+   
     outputs, _, _ = tf.nn.fused_batch_norm(
         inputs, gamma, beta, mean = None, variance = None, epsilon = epsilon,
         data_format = data_format, is_training = is_training)
