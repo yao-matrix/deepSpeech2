@@ -3,13 +3,16 @@ import numpy as np
 import tensorflow as tf
 
 
-utt_lengths = [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500]
-counts = [3, 10, 11, 13, 14, 13, 9, 8, 5, 4, 3, 2, 2, 2, 1]
-label_lengths = [7, 17, 35, 48, 62, 78, 93, 107, 120, 134, 148, 163, 178, 193, 209]
+# counts = [3, 10, 11, 13, 14, 13, 9, 8, 5, 4, 3, 2, 2, 2, 1]
+# label_lengths = [7, 17, 35, 48, 62, 78, 93, 107, 120, 134, 148, 163, 178, 193, 209]
+
+utt_lengths = [100, 200, 100, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1300, 1400, 1500]
+counts = [3, 3, 3, 3, 14, 13, 9, 8, 5, 4, 3, 2, 2, 2, 1]
+label_lengths = [7, 17, 7, 48, 62, 78, 93, 107, 120, 134, 148, 163, 178, 193, 209]
 
 freq_bins = 161
 # scale_factor = 10 * 128
-scale_factor = 128
+scale_factor = 10
 extra = 1000
 
 g_utter_counts = [x * scale_factor for x in counts]
@@ -100,7 +103,7 @@ def _dense_to_sparse(dense):
     return idx, val, dense.shape
 
 
-def inputs(eval_data, data_dir, batch_size, shuffle = False):
+def inputs(batch_size):
     """Construct input for dummy data
 
     Returns:
@@ -110,19 +113,18 @@ def inputs(eval_data, data_dir, batch_size, shuffle = False):
 
     """
     utt_length, feat, label = _next(batch_size)
-    # print utt_length
-    # print input.shape
-    # print label
 
-    seq_len = tf.constant(utt_length, shape = [batch_size])
+    print 'seq_len: %d' % utt_length
+    seq_lens = np.full(batch_size, utt_length)
 
-    feats = tf.reshape(feat, [batch_size, utt_length, freq_bins])
+    feats = np.reshape(feat, [batch_size, utt_length, freq_bins])
+
     labels = np.zeros((batch_size, len(label)))
     for x in range(batch_size):
         labels[x] = label
     idx, vals, s_shape = _dense_to_sparse(labels)
-    t_labels = tf.SparseTensor(indices = idx, values = vals, dense_shape = s_shape)
-    print feats, t_labels, seq_len
-    return tf.cast(feats, tf.float32), tf.cast(t_labels, tf.int32), seq_len
-
+    # t_labels = tf.SparseTensor(indices = idx, values = vals, dense_shape = s_shape)
+    # print feats, t_labels, seq_len
+    # return feats.astype(np.float32), tf.cast(t_labels, tf.int32), seq_lens.astype(np.int32)
+    return feats.astype(np.float32), idx, vals, s_shape, seq_lens.astype(np.int32)
 

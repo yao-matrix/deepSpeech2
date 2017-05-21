@@ -43,10 +43,12 @@ import tensorflow as tf
 from tensorflow.python.client import device_lib
 from tensorflow.python.client import timeline
 import helper_routines
+import deepSpeech_dummy
 from tensorflow.python import debug as tf_debug
 
 DEBUG = False
 NCHW = True
+DUMMY = True
 
 if NCHW is True:
   import deepSpeech_NCHW as deepSpeech
@@ -56,6 +58,17 @@ else:
 from setenvs import setenvs
 from setenvs import arglist
 args = arglist()
+
+
+g = tf.Graph()
+if DUMMY:
+    with g.as_default():
+        feats_batch = tf.placeholder(dtype=tf.float32, shape=[None, None, deepSpeech_dummy.freq_bins])
+        idx_batch = tf.placeholder(dtype=tf.int64)
+        vals_batch = tf.placeholder(dtype=tf.int64)
+        shape_batch  = tf.placeholder(dtype=tf.int64)
+        #labels_batch = tf.sparse_placeholder(dtype=tf.int32)
+        seq_lens_batch = tf.placeholder(dtype=tf.int32, shape=[None])
 
 def parse_args():
     " Parses command line arguments."
@@ -323,21 +336,48 @@ def run_train_loop(sess, operations, saver):
     # Evaluate the ops for max_steps
     for step in range(ARGS.max_steps):
         start_time = time.time()
-        _, loss_value = sess.run([train_op, loss_op], options = run_options, run_metadata = run_metadata)
+        
+        if DUMMY:
+            feats, idx, vals, shape, seq_lens = deepSpeech_dummy.inputs(ARGS.batch_size) 
+            data_gen_time = time.time()
+            # labels_val = labels.eval(session=sess)
+            # label_val_time = time.time()
+            dummy_input_duration = data_gen_time - start_time
+            # label_val_duration = label_val_time - data_gen_time
+            _, loss_value = sess.run([train_op, loss_op], options = run_options, run_metadata = run_metadata, 
+                                     feed_dict = {feats_batch: feats,
+                                                  idx_batch: idx, 
+                                                  vals_batch: vals,
+                                                  shape_batch: shape,
+                                                  seq_lens_batch: seq_lens
+                                                 })
+        else:
+            _, loss_value = sess.run([train_op, loss_op], options = run_options, run_metadata = run_metadata)
+ 
+
         duration = time.time() - start_time
         assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
 
         # Print progress periodically
         if step % 10 == 0:
             examples_per_sec = (ARGS.batch_size * ARGS.num_gpus) / duration
-            format_str = ('%s: step %d, '
+            if DUMMY:
+                format_str = ('%s: step %d, '
+                              'loss = %.2f (%.1f examples/sec; %.3f '
+                              'sec/batch; '
+                              '%.3f dummy sec/batch)')
+                print(format_str % (datetime.now(), step, loss_value,
+                                    examples_per_sec, duration / ARGS.num_gpus,
+                                    dummy_input_duration))
+            else:
+                format_str = ('%s: step %d, '
                           'loss = %.2f (%.1f examples/sec; %.3f '
                           'sec/batch)')
-            print(format_str % (datetime.now(), step, loss_value,
-                                examples_per_sec, duration / ARGS.num_gpus))
+                print(format_str % (datetime.now(), step, loss_value,
+                                    examples_per_sec, duration / ARGS.num_gpus))
 
         # Run the summary ops periodically
-        if step % 50 == 0:
+        if step % 50 == 0 and not DUMMY:
             summary_writer = tf.summary.FileWriter(ARGS.train_dir, sess.graph)
             summary_writer.add_summary(sess.run(summary_op), step)
 
@@ -395,9 +435,7 @@ def add_summaries(summaries, learning_rate, grads):
     # Add histograms for gradients.
     for grad, var in grads:
         if grad is not None:
-            summaries.append(
-                tf.summary.histogram(var.op.name +
-                                     '/gradients', grad))
+            summaries.append(tf.summary.histogram(var.op.name + '/gradients', grad))
     # Add histograms for trainable variables.
     for var in tf.trainable_variables():
         summaries.append(tf.summary.histogram(var.op.name, var))
@@ -413,7 +451,7 @@ def train():
     weights.
 
     """
-    with tf.Graph().as_default(), tf.device('/cpu'):
+    with g.as_default(), tf.device('/cpu'):
 
         # Learning rate set up
         learning_rate, global_step = set_learning_rate()
@@ -422,7 +460,15 @@ def train():
         optimizer = tf.train.AdamOptimizer(learning_rate)
 
         # Fetch a batch worth of data for each tower
-        data = fetch_data()
+        if not DUMMY: 
+            data = fetch_data()
+        else: 
+            # idx, vals, s_shape = deepSpeech_dummy.dense_to_sparse(labels_batch, labels_batch_w, labels_batch_h)
+            labels_batch = tf.SparseTensor(indices = idx_batch, values = vals_batch, dense_shape = shape_batch)
+            split_feats = tf.split(feats_batch, ARGS.num_gpus, 0)
+            split_labels = tf.sparse_split(sp_input = tf.cast(labels_batch, tf.int32), num_split = ARGS.num_gpus, axis = 0)
+            split_seq_lens = tf.split(seq_lens_batch, ARGS.num_gpus, 0)
+            data = [split_feats, split_labels, split_seq_lens]
 
         # Construct loss and gradient ops
         loss_op, tower_grads, summaries = get_loss_grads(data, optimizer)
@@ -470,8 +516,9 @@ def train():
             print "does not have checkpoint"
             sess.run(tf.global_variables_initializer())
 
-        # Start the queue runners.
-        tf.train.start_queue_runners(sess)
+        if not DUMMY:
+            # Start the queue runners.
+            tf.train.start_queue_runners(sess)
 
         # Run training loop
         run_train_loop(sess, (train_op, loss_op, summary_op), saver)

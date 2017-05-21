@@ -67,17 +67,12 @@ def inputs(eval_data, data_dir, batch_size, use_fp16, shuffle):
       ValueError: If no data_dir
     """
     if not data_dir:
-        print 'Using dummy data'
-        feats, labels, seq_lens = deepSpeech_dummy.inputs(eval_data = eval_data,
-                                                          data_dir = data_dir,
-                                                          batch_size = batch_size,
-                                                          shuffle = shuffle)
-    else:
-        print 'Using Libri data'
-        feats, labels, seq_lens = deepSpeech_input.inputs(eval_data = eval_data,
-                                                          data_dir = data_dir,
-                                                          batch_size = batch_size,
-                                                          shuffle = shuffle)
+        raise ValueError('Please supply a data_dir')
+    print 'Using Libri Data'
+    feats, labels, seq_lens = deepSpeech_input.inputs(eval_data = eval_data,
+                                                      data_dir = data_dir,
+                                                      batch_size = batch_size,
+                                                      shuffle = shuffle)
     if use_fp16:
         feats = tf.cast(feats, tf.float16)
     return feats, labels, seq_lens
