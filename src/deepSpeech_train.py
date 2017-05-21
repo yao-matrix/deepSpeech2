@@ -311,8 +311,10 @@ def get_loss_grads(data, optimizer):
 def run_train_loop(sess, operations, saver):
     """ Train the model for required number of steps."""
     (train_op, loss_op, summary_op) = operations
-    summary_writer = tf.summary.FileWriter(ARGS.train_dir, sess.graph)
 
+    run_options = None
+    run_metadata = None
+    trace_file = None
     if DEBUG:
         run_options = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
         run_metadata = tf.RunMetadata()
@@ -321,14 +323,11 @@ def run_train_loop(sess, operations, saver):
     # Evaluate the ops for max_steps
     for step in range(ARGS.max_steps):
         start_time = time.time()
-        if DEBUG:
-            _, loss_value = sess.run([train_op, loss_op], options = run_options, run_metadata = run_metadata)
-        else:
-            _, loss_value = sess.run([train_op, loss_op])
+        _, loss_value = sess.run([train_op, loss_op], options = run_options, run_metadata = run_metadata)
         duration = time.time() - start_time
         assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
 
-        # Print progress periodically.
+        # Print progress periodically
         if step % 10 == 0:
             examples_per_sec = (ARGS.batch_size * ARGS.num_gpus) / duration
             format_str = ('%s: step %d, '
@@ -337,25 +336,37 @@ def run_train_loop(sess, operations, saver):
             print(format_str % (datetime.now(), step, loss_value,
                                 examples_per_sec, duration / ARGS.num_gpus))
 
-        # Run the summary ops periodically.
+        # Run the summary ops periodically
         if step % 50 == 0:
+            summary_writer = tf.summary.FileWriter(ARGS.train_dir, sess.graph)
             summary_writer.add_summary(sess.run(summary_op), step)
 
-        # Save the model checkpoint periodically.
-        if step % 100 == 0 or (step + 1) == ARGS.max_steps:
+        # Save the model checkpoint periodically
+        if step % 1000 == 0 or (step + 1) == ARGS.max_steps:
             checkpoint_path = os.path.join(ARGS.train_dir, 'model.ckpt')
             saver.save(sess, checkpoint_path, global_step = step)
 
-        if DEBUG and step == 10:
+        if DEBUG and step == 20:
             trace = timeline.Timeline(run_metadata.step_stats)
             trace_file.write(trace.generate_chrome_trace_format())
 
-            tf.contrib.tfprof.model_analyzer.print_model_analysis(tf.get_default_graph(),
-                                                                  tfprof_options = tf.contrib.tfprof.model_analyzer.FLOAT_OPS_OPTIONS)
+            prof_options = tf.contrib.tfprof.model_analyzer.TRAINABLE_VARS_PARAMS_STAT_OPTIONS
+            prof_options['dump_to_file'] = "./params.log"
+            param_stats = tf.contrib.tfprof.model_analyzer.print_model_analysis(tf.get_default_graph(),
+                                                                                tfprof_options = prof_options)
+            # sys.stdout.write('total_params: %d\n' % param_stats.total_parameters)
 
+            prof_options = tf.contrib.tfprof.model_analyzer.FLOAT_OPS_OPTIONS
+            prof_options['dump_to_file'] = "./flops.log" 
             tf.contrib.tfprof.model_analyzer.print_model_analysis(tf.get_default_graph(),
                                                                   run_meta = run_metadata,
-                                                                  tfprof_options = tf.contrib.tfprof.model_analyzer.PRINT_ALL_TIMING_MEMORY)
+                                                                  tfprof_options = prof_options)
+
+            prof_options = tf.contrib.tfprof.model_analyzer.PRINT_ALL_TIMING_MEMORY
+            prof_options['dump_to_file'] = "./timing_memory.log"  
+            tf.contrib.tfprof.model_analyzer.print_model_analysis(tf.get_default_graph(),
+                                                                  run_meta = run_metadata,
+                                                                  tfprof_options = prof_options)
 
 
 def initialize_from_checkpoint(sess, saver):
