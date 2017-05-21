@@ -189,13 +189,13 @@ def inference(feats, seq_lens, params):
                                                sequence_length = rnn_seq_lens,
                                                dtype = dtype, time_major = True,
                                                scope = scope.name,
-                                               swap_memory = True)
+                                               swap_memory = False)
         else:
             outputs, _ = tf.nn.bidirectional_dynamic_rnn(
                 multi_cell, multi_cell, rnn_input,
                 sequence_length = rnn_seq_lens, dtype = dtype,
                 time_major = True, scope = scope.name,
-                swap_memory = True)
+                swap_memory = False)
             outputs_fw, outputs_bw = outputs
             rnn_outputs = outputs_fw + outputs_bw
         _activation_summary(rnn_outputs)

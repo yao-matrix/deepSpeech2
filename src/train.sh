@@ -13,6 +13,10 @@ export LD_LIBRARY_PATH=/usr/local/cuda/extras/CUPTI/lib64/:$LD_LIBRARY_PATH
 # activate Intel Python
 # source /opt/intel/intelpython2/bin/activate
 
+# environment variables
+unset TF_CPP_MIN_VLOG_LEVEL
+# export TF_CPP_MIN_VLOG_LEVEL=1
+
 # echo "Training on utterances in order sorted by length"
 #export CUDA_VISIBLE_DEVICES=0,1
 # filename='../models/librispeech/train'

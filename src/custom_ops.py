@@ -127,7 +127,7 @@ def batch_norm2(inputs,
 
     if scale:
       gamma = _variable_on_cpu('gamma', params_shape, initializer = tf.ones_initializer())
-   
+ 
     outputs, _, _ = tf.nn.fused_batch_norm(
         inputs, gamma, beta, mean = None, variance = None, epsilon = epsilon,
         data_format = data_format, is_training = is_training)

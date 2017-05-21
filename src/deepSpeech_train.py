@@ -118,8 +118,6 @@ def parse_args():
     parser.add_argument('--inter_op', type = int, default = 1,
                         help = 'Inter op thread num')
  
-
-
     args = parser.parse_args()
 
     # Read architecture hyper-parameters from checkpoint file
@@ -260,7 +258,7 @@ def set_learning_rate():
 
 def fetch_data():
     """ Fetch features, labels and sequence_lengths from a common queue."""
-    print "gpu num: ", ARGS.num_gpus
+    # print "gpu num: ", ARGS.num_gpus
 
     tot_batch_size = ARGS.batch_size * ARGS.num_gpus
     feats, labels, seq_lens = deepSpeech.inputs(eval_data = 'train',
@@ -286,7 +284,7 @@ def get_loss_grads(data, optimizer):
     tower_grads = []
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
         for i in range(ARGS.num_gpus):
-            with tf.device('/gpu:%d' % i):
+            with tf.device('/cpu:%d' % i):
                 name_scope = '%s_%d' % (helper_routines.TOWER_NAME, i)
                 with tf.name_scope(name_scope) as scope:
                     # Calculate the loss for one tower of the deepSpeech model.
@@ -357,7 +355,7 @@ def run_train_loop(sess, operations, saver):
 
             tf.contrib.tfprof.model_analyzer.print_model_analysis(tf.get_default_graph(),
                                                                   run_meta = run_metadata,
-                                                                  tfprof_options = tf.contrib.tfprof.model_analyzer.PRINT_ALL_TIMING_MOMORY)
+                                                                  tfprof_options = tf.contrib.tfprof.model_analyzer.PRINT_ALL_TIMING_MEMORY)
 
 
 def initialize_from_checkpoint(sess, saver):
@@ -421,6 +419,7 @@ def train():
         # We must calculate the mean of each gradient. Note that this is the
         # synchronization point across all towers.
         grads = average_gradients(tower_grads)
+        # grads = tower_grads[0]
 
         # Apply the gradients to adjust the shared variables.
         apply_gradient_op = optimizer.apply_gradients(grads,
@@ -476,12 +475,13 @@ def main():
         if tf.gfile.Exists(ARGS.train_dir):
             tf.gfile.DeleteRecursively(ARGS.train_dir)
         tf.gfile.MakeDirs(ARGS.train_dir)
+
     # Dump command line arguments to a parameter file,
     # in-case the network training resumes at a later time.
     with open(os.path.join(ARGS.train_dir,
                            'deepSpeech_parameters.json'), 'w') as outfile:
-        json.dump(vars(ARGS), outfile, sort_keys=True, indent=4)
-    
+        json.dump(vars(ARGS), outfile, sort_keys = True, indent = 4)
+
     args = setenvs(sys.argv)
     print('Running on CPU: ', args.cpu)
   
