@@ -70,6 +70,29 @@ class CustomRNNCell2(BasicRNNCell):
         return output, output
 
 
+def stacked_brnn(cell, num_units, num_layers, inputs, seq_lengths, batch_size):
+    """
+    multi layer bidirectional rnn
+    :param cell: RNN class
+    :param num_units: hidden unit of RNN cell
+    :param num_layers: the number of layers
+    :param inputs: the input sequence
+    :param seq_lengths: sequence length
+    :param batch_size:
+    :return: the output of last layer bidirectional rnn with concatenating
+    """
+    _inputs = inputs
+    for _ in range(num_layers):
+        with tf.variable_scope(None, default_name = "brnn"):
+            initial_state_fw = rnn_cell_fw.zero_state(batch_size, dtype = tf.float32)
+            initial_state_bw = rnn_cell_bw.zero_state(batch_size, dtype = tf.float32)
+            (outputs, state) = tf.nn.bidirectional_dynamic_rnn(cell, cell, _inputs, seq_lengths,
+                                                              initial_state_fw, initial_state_bw, dtype = tf.float32) 
+            outputs_fw, outputs_bw = outputs
+            _inputs = outputs_fw + outputs_bw
+    return _inputs
+
+
 def relux(x, capping = None):
     """Clipped ReLU"""
     x = tf.nn.relu(x)
