@@ -63,12 +63,12 @@ args = arglist()
 g = tf.Graph()
 if DUMMY:
     with g.as_default():
-        feats_batch = tf.placeholder(dtype=tf.float32, shape=[None, None, deepSpeech_dummy.freq_bins])
-        idx_batch = tf.placeholder(dtype=tf.int64)
-        vals_batch = tf.placeholder(dtype=tf.int64)
-        shape_batch  = tf.placeholder(dtype=tf.int64)
-        #labels_batch = tf.sparse_placeholder(dtype=tf.int32)
-        seq_lens_batch = tf.placeholder(dtype=tf.int32, shape=[None])
+        feats_batch = tf.placeholder(dtype = tf.float32, shape = [None, None, deepSpeech_dummy.freq_bins])
+        idx_batch = tf.placeholder(dtype = tf.int64)
+        vals_batch = tf.placeholder(dtype = tf.int64)
+        shape_batch = tf.placeholder(dtype = tf.int64)
+        # labels_batch = tf.sparse_placeholder(dtype = tf.int32)
+        seq_lens_batch = tf.placeholder(dtype = tf.int32, shape = [None])
 
 def parse_args():
     " Parses command line arguments."
@@ -338,12 +338,10 @@ def run_train_loop(sess, operations, saver):
         start_time = time.time()
         
         if DUMMY:
-            feats, idx, vals, shape, seq_lens = deepSpeech_dummy.inputs(ARGS.batch_size) 
             data_gen_time = time.time()
-            # labels_val = labels.eval(session=sess)
-            # label_val_time = time.time()
+            feats, idx, vals, shape, seq_lens = deepSpeech_dummy.inputs(ARGS.batch_size)
+            # labels_val = labels.eval(session = sess)
             dummy_input_duration = data_gen_time - start_time
-            # label_val_duration = label_val_time - data_gen_time
             _, loss_value = sess.run([train_op, loss_op], options = run_options, run_metadata = run_metadata, 
                                      feed_dict = {feats_batch: feats,
                                                   idx_batch: idx, 
@@ -397,14 +395,16 @@ def run_train_loop(sess, operations, saver):
             # sys.stdout.write('total_params: %d\n' % param_stats.total_parameters)
 
             prof_options = tf.contrib.tfprof.model_analyzer.FLOAT_OPS_OPTIONS
-            prof_options['dump_to_file'] = "./flops.log" 
+            prof_options['dump_to_file'] = "./flops.log"
             tf.contrib.tfprof.model_analyzer.print_model_analysis(tf.get_default_graph(),
                                                                   run_meta = run_metadata,
                                                                   tfprof_options = prof_options)
 
             prof_options = tf.contrib.tfprof.model_analyzer.PRINT_ALL_TIMING_MEMORY
-            prof_options['dump_to_file'] = "./timing_memory.log"  
+            prof_options['dump_to_file'] = "./timing_memory.log"
+            prof_options['start_name_regexes'] = "ctc_loss"
             tf.contrib.tfprof.model_analyzer.print_model_analysis(tf.get_default_graph(),
+                                                                  tfprof_cmd = 'graph',
                                                                   run_meta = run_metadata,
                                                                   tfprof_options = prof_options)
 
@@ -452,7 +452,6 @@ def train():
 
     """
     with g.as_default(), tf.device('/cpu'):
-
         # Learning rate set up
         learning_rate, global_step = set_learning_rate()
 
@@ -505,6 +504,7 @@ def train():
             log_device_placement = ARGS.log_device_placement,
             inter_op_parallelism_threads = ARGS.inter_op,
             intra_op_parallelism_threads = ARGS.intra_op))
+            
         # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
         # sess.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
 
@@ -519,6 +519,8 @@ def train():
         if not DUMMY:
             # Start the queue runners.
             tf.train.start_queue_runners(sess)
+
+        g.finalize()
 
         # Run training loop
         run_train_loop(sess, (train_op, loss_op, summary_op), saver)

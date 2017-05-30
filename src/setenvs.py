@@ -23,6 +23,7 @@ def setenvs(inargv):
     else:
         os.environ["KMP_BLOCKTIME"] = "1"
         os.environ["KMP_SETTINGS"] = "1"
-        os.environ["OMP_NUM_THREADS"] = "136"
-	os.environ["KMP_AFFINITY"] = "granularity=fine,verbose,compact,1,0"
+        os.environ["OMP_NUM_THREADS"] = "67"
+        os.environ["OMP_DYNAMIC"] = "false"
+        os.environ["KMP_AFFINITY"] = "granularity=fine,verbose,compact,1,0"
     return args     
