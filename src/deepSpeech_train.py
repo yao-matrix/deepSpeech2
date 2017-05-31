@@ -46,7 +46,7 @@ import helper_routines
 import deepSpeech_dummy
 from tensorflow.python import debug as tf_debug
 
-DEBUG = False
+DEBUG = True
 NCHW = True
 DUMMY = True
 
@@ -338,8 +338,8 @@ def run_train_loop(sess, operations, saver):
         start_time = time.time()
         
         if DUMMY:
-            data_gen_time = time.time()
             feats, idx, vals, shape, seq_lens = deepSpeech_dummy.inputs(ARGS.batch_size)
+            data_gen_time = time.time()
             # labels_val = labels.eval(session = sess)
             dummy_input_duration = data_gen_time - start_time
             _, loss_value = sess.run([train_op, loss_op], options = run_options, run_metadata = run_metadata, 
