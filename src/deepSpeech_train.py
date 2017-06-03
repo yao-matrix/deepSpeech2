@@ -46,7 +46,7 @@ import helper_routines
 import deepSpeech_dummy
 from tensorflow.python import debug as tf_debug
 
-DEBUG = True
+DEBUG = False
 NCHW = True
 DUMMY = True
 
@@ -549,8 +549,8 @@ def main():
         ARGS.intra_op = 44
         ARGS.inter_op = 1
     elif args.cpu == 'knl':
-        ARGS.intra_op = 272
-        ARGS.inter_op = 4
+        ARGS.intra_op = 8
+        ARGS.inter_op = 8
 
     print('Running inter_op :', ARGS.inter_op)
     print('Running intra_op :', ARGS.intra_op)

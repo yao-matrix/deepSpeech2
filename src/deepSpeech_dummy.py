@@ -114,7 +114,7 @@ def inputs(batch_size):
     """
     utt_length, feat, label = _next(batch_size)
 
-    print 'seq_len: %d' % utt_length
+    # print 'seq_len: %d' % utt_length
     seq_lens = np.full(batch_size, utt_length)
 
     feats = np.reshape(feat, [batch_size, utt_length, freq_bins])
