@@ -59,6 +59,7 @@ from setenvs import setenvs
 from setenvs import arglist
 args = arglist()
 
+profiling = []
 
 g = tf.Graph()
 if DUMMY:
@@ -356,23 +357,26 @@ def run_train_loop(sess, operations, saver):
         duration = time.time() - start_time
         assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
 
+        if step >= 10:
+          profiling.append(duration)
+
         # Print progress periodically
-        if step % 10 == 0:
-            examples_per_sec = (ARGS.batch_size * ARGS.num_gpus) / duration
+        if step > 10 and step % 10 == 0:
+            examples_per_sec = (ARGS.batch_size * ARGS.num_gpus) / np.average(profiling)
             if DUMMY:
                 format_str = ('%s: step %d, '
                               'loss = %.2f (%.1f examples/sec; %.3f '
                               'sec/batch; '
                               '%.3f dummy sec/batch)')
                 print(format_str % (datetime.now(), step, loss_value,
-                                    examples_per_sec, duration / ARGS.num_gpus,
+                                    examples_per_sec, np.average(profiling) / ARGS.num_gpus,
                                     dummy_input_duration))
             else:
                 format_str = ('%s: step %d, '
                           'loss = %.2f (%.1f examples/sec; %.3f '
                           'sec/batch)')
                 print(format_str % (datetime.now(), step, loss_value,
-                                    examples_per_sec, duration / ARGS.num_gpus))
+                                    examples_per_sec, np.average(profiling) / ARGS.num_gpus))
 
         # Run the summary ops periodically
         if step % 50 == 0 and not DUMMY:
@@ -552,8 +556,8 @@ def main():
         ARGS.intra_op = 8
         ARGS.inter_op = 8
 
-    print('Running inter_op :', ARGS.inter_op)
-    print('Running intra_op :', ARGS.intra_op)
+    print('Running inter_op: ', ARGS.inter_op)
+    print('Running intra_op: ', ARGS.intra_op)
  
     train()
 

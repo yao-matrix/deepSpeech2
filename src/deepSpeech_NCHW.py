@@ -165,12 +165,10 @@ def inference(feats, seq_lens, params):
     ######################
     # conv2 = tf.Print(conv2, [conv2.get_shape()], "Conved Tensor Shape: ")
     with tf.variable_scope('rnn') as scope:
-        # N, C, T, F => N, T, C, F
-        rnn_input = tf.transpose(conv2, perm = [0, 2, 1, 3])
-        # Reshape conv output to fit rnn input: N, T, F * 32
-        rnn_input = tf.reshape(rnn_input, [params.batch_size, -1, 75 * params.num_filters])
-        # Permute into time major order for rnn: T, N, F * 32
-        rnn_input = tf.transpose(rnn_input, perm = [1, 0, 2])
+        # N, C, T, F => T, N, C, F
+        rnn_input1 = tf.transpose(conv2, perm = [2, 0, 1, 3])
+        # Reshape conv output to fit rnn input: T, N, 32 * F
+        rnn_input = tf.reshape(rnn_input1, [-1, params.batch_size, 75 * params.num_filters])
         # Make one instance of cell on a fixed device,
         # and use copies of the weights on other devices.
         cell = custom_ops.CustomRNNCell2(
