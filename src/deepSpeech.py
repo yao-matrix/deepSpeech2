@@ -158,34 +158,32 @@ def inference(feats, seq_lens, params):
     ######################
     # recurrent layers
     ######################
-    with tf.variable_scope('rnn') as scope:
-        # Reshape conv output to fit rnn input: N, T, F * 32
-        rnn_input = tf.reshape(conv2, [params.batch_size, -1, 75 * params.num_filters])
-        # Permute into time major order for rnn: T, N, F * 32
-        rnn_input = tf.transpose(rnn_input, perm = [1, 0, 2])
-        # Make one instance of cell on a fixed device,
-        # and use copies of the weights on other devices.
-        cell = custom_ops.CustomRNNCell2(
+    # Reshape conv output to fit rnn input: N, T, F * 32
+    rnn_input = tf.reshape(conv2, [params.batch_size, -1, 75 * params.num_filters])
+    # Permute into time major order for rnn: T, N, F * 32
+    rnn_input = tf.transpose(rnn_input, perm = [1, 0, 2])
+    # Make one instance of cell on a fixed device,
+    # and use copies of the weights on other devices.
+    cell = custom_ops.CustomRNNCell2(
             params.num_hidden,
             use_fp16 = params.use_fp16)
-        multi_cell = tf.contrib.rnn.MultiRNNCell([cell] * params.num_rnn_layers)
+    multi_cell = tf.contrib.rnn.MultiRNNCell([cell] * params.num_rnn_layers)
 
-        rnn_seq_lens = get_rnn_seqlen(seq_lens)
-        if params.rnn_type == 'uni-dir':
-            rnn_outputs, _ = tf.nn.dynamic_rnn(multi_cell, rnn_input,
-                                               sequence_length = rnn_seq_lens,
-                                               dtype = dtype, time_major = True,
-                                               scope = scope.name,
-                                               swap_memory = True)
-        else:
-            outputs, _ = tf.nn.bidirectional_dynamic_rnn(
+    rnn_seq_lens = get_rnn_seqlen(seq_lens)
+    if params.rnn_type == 'uni-dir':
+        rnn_outputs, _ = tf.nn.dynamic_rnn(multi_cell, rnn_input,
+                                           sequence_length = rnn_seq_lens,
+                                           dtype = dtype, time_major = True,
+                                           swap_memory = True)
+    else:
+        outputs, _ = tf.nn.bidirectional_dynamic_rnn(
                 multi_cell, multi_cell, rnn_input,
                 sequence_length = rnn_seq_lens, dtype = dtype,
-                time_major = True, scope = scope.name,
-                swap_memory = True)
-            outputs_fw, outputs_bw = outputs
-            rnn_outputs = outputs_fw + outputs_bw
-        _activation_summary(rnn_outputs)
+                time_major = True,
+                swap_memory = False)
+        outputs_fw, outputs_bw = outputs
+        rnn_outputs = outputs_fw + outputs_bw
+    _activation_summary(rnn_outputs)
 
     # Linear layer(WX + b) - softmax is applied by CTC cost function.
     with tf.variable_scope('softmax_linear') as scope:

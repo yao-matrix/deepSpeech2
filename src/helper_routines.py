@@ -28,7 +28,7 @@ def _activation_summary(act):
     tf.summary.scalar(tensor_name + '/sparsity', tf.nn.zero_fraction(act))
 
 
-def _variable_on_cpu(name, shape, initializer = None, use_fp16 = False):
+def _variable_on_cpu(name, shape, initializer = None, use_fp16 = False, trainable = True):
     """Helper to create a Variable stored on cpu memory.
 
     Args:
@@ -42,7 +42,7 @@ def _variable_on_cpu(name, shape, initializer = None, use_fp16 = False):
     with tf.device('/cpu'):
         dtype = tf.float16 if use_fp16 else tf.float32
         var = tf.get_variable(name, shape,
-                              initializer = initializer, dtype = dtype)
+                              initializer = initializer, dtype = dtype, trainable = trainable)
     return var
 
 

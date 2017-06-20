@@ -7,6 +7,7 @@ variables are re-used between devices.
 from tensorflow.contrib.rnn import BasicRNNCell
 from tensorflow.python.util import nest
 import tensorflow as tf
+from tensorflow.python.training import moving_averages
 
 from helper_routines import _variable_on_cpu
 
@@ -60,6 +61,7 @@ class CustomRNNCell2(BasicRNNCell):
             resi = tf.matmul(inputs, w, transpose_a = False, transpose_b = True)
             # batch_size * num_units
             bn_resi = seq_batch_norm(resi)
+            # bn_resi = resi
             usize = state.get_shape()[1]
             u = _variable_on_cpu('U', [self._num_units, usize], use_fp16 = self.use_fp16)
             resu = tf.matmul(state, u, transpose_a = False, transpose_b = True)
@@ -81,7 +83,7 @@ def stacked_brnn(cell, num_units, num_layers, inputs, seq_lengths, batch_size):
     :param batch_size:
     :return: the output of last layer bidirectional rnn with concatenating
     """
-    _inputs = inputs
+    inputs = inputs
     for _ in range(num_layers):
         with tf.variable_scope(None, default_name = "brnn"):
             initial_state_fw = rnn_cell_fw.zero_state(batch_size, dtype = tf.float32)
@@ -167,7 +169,7 @@ def batch_norm(x, scope = None, is_train = True, data_format = None):
         beta = _variable_on_cpu('beta', [param_shape], initializer = tf.zeros_initializer())
         gamma = _variable_on_cpu('gamma', [param_shape], initializer = tf.ones_initializer())
         batch_mean, batch_var = tf.nn.moments(x, [0, 1, 2], name = 'moments')
-        ema = tf.train.ExponentialMovingAverage(decay = 0.5)
+        ema = tf.train.ExponentialMovingAverage(decay = 0.5, zero_debias = True)
         def mean_var_with_update():
             ema_apply_op = ema.apply([batch_mean, batch_var])
             with tf.control_dependencies([ema_apply_op]):
@@ -182,22 +184,19 @@ def batch_norm(x, scope = None, is_train = True, data_format = None):
 
 def seq_batch_norm(x, scope = None, is_train = True):
     """sequence batch normalization, input N * D"""
-    with tf.variable_scope(scope or 'sbn'):
-        inputs_shape = x.get_shape()
-        param_shape = inputs_shape[-1]
-        beta = _variable_on_cpu('beta', [param_shape], initializer = tf.zeros_initializer())
-        gamma = _variable_on_cpu('gamma', [param_shape], initializer = tf.ones_initializer())
-        batch_mean, batch_var = tf.nn.moments(x, [0], name = 'moments')
-        ema = tf.train.ExponentialMovingAverage(decay = 0.5)
-        def mean_var_with_update():
-            ema_apply_op = ema.apply([batch_mean, batch_var])
-            with tf.control_dependencies([ema_apply_op]):
-                return tf.identity(batch_mean), tf.identity(batch_var)
-        if is_train:
-            mean, var = mean_var_with_update()
-        else:
-            mean, var = lambda : (ema.average(batch_mean), ema.average(batch_var))
-        normed = tf.nn.batch_normalization(x, mean, var, beta, gamma, 1e-5)
+    with tf.name_scope(None):
+        with tf.variable_scope("sbn", reuse = False):
+            inputs_shape = x.get_shape()
+            param_shape = inputs_shape[-1]
+            beta = _variable_on_cpu('beta', [param_shape], initializer = tf.zeros_initializer(), trainable = False)
+            gamma = _variable_on_cpu('gamma', [param_shape], initializer = tf.ones_initializer(), trainable = False)
+            batch_mean, batch_var = tf.nn.moments(x, [0], name = 'moments')
+
+            moving_mean = _variable_on_cpu('moving_mean', [param_shape], initializer = tf.zeros_initializer(), trainable = False)	
+            moving_variance = _variable_on_cpu('moving_variance', [param_shape], initializer = tf.ones_initializer(), trainable = False)
+            moving_averages.assign_moving_average(moving_mean, batch_mean, 0.5)
+            moving_averages.assign_moving_average(moving_variance, batch_var, 0.5)
+            normed = tf.nn.batch_normalization(x, moving_mean, moving_variance, beta, gamma, 1e-5)
     return normed
 
 

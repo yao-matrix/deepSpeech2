@@ -1,6 +1,6 @@
 # Author: Lakshmi Krishnan
 # Email: lkrishn7@ford.com
-# Author: YAO MAtrix
+# Author: YAO Matrix
 # Email: yaoweifeng0301@126.com
 
 
@@ -47,7 +47,7 @@ import deepSpeech_dummy
 from tensorflow.python import debug as tf_debug
 
 DEBUG = False
-NCHW = True
+NCHW = False
 DUMMY = True
 
 if NCHW is True:
