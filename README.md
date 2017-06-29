@@ -8,6 +8,7 @@ This software is released under a BSD license. The license to this software does
 Pre-requisites
 -------------
 * TensorFlow - version: 1.1.0
+* Python     - version: 2.7
 * python-levenshtein - to compute Character-Error-Rate
 * python_speech_features - to generate mfcc features
 * PySoundFile - to read FLAC files
@@ -19,6 +20,7 @@ Getting started
 *Step 1: Install all dependencies.*
 
 ```
+$ yum install libsndfile
 $ pip install python-Levenshtein
 $ pip install python_speech_features
 $ pip install PySoundFile
@@ -62,7 +64,7 @@ $ tar xvzf ../test-clean.tar.gz LibriSpeech/test-clean  --strip-components=1
 
 The computed mfcc features will be stored within TFRecords files inside data/librispeech/processed/
 ```
-$ cd ../../../code/
+$ cd ./src
 $ python preprocess_LibriSpeech.py
 ```
 
@@ -73,6 +75,7 @@ $ cd ./src
 $ . ./train.sh
 
 # To continue training from a saved checkpoint file
+$cd ./src
 $python deepSpeech_train.py --checkpoint_dir PATH_TO_SAVED_CHECKPOINT_FILE --max_steps 40000
 ```
 The script train.sh contains commands to train on utterances in sorted order for the first epoch and then to resume training on shuffled utterances.
@@ -82,11 +85,16 @@ Monitoring training
 --------------------
 Since the training data is fed through a shuffled queue, to check validation loss a separate graph needs to be set up in a different session and potentially on an additional GPU. This graph is fed with the valildation data to compute predictions. The deepSpeech_test.py script initializes the graph from a previously saved checkpoint file and computes the CER on the eval_data every 5 minutes by default. It saves the computed CER values in the models/librispeech/eval folder. By calling tensorboard with logdir set to models/librispeech, it is possible to monitor validation CER and training loss during training.
 ```
+$cd ./src
 $python deepSpeech_test.py --eval_data 'val' --checkpoint_dir PATH_TO_SAVED_CHECKPOINT_FILE
 $tensorboard --logdir PATH_TO_SUMMARY
 ```
 Testing a model
 ----------------
 ```
+$cd ./src
 $python deepSpeech_test.py --eval_data 'test' --checkpoint_dir PATH_TO_SAVED_CHECKPOINT_FILE
 ```
+
+# Thanks
+Thanks to Aswathy to help refine the README
