@@ -73,10 +73,14 @@ Training a model w/ dummy data
 ```
 $ cd ./src
 $ . ./train.sh
+```
 
+Training a model w/ real data
+----------------
+```
 # To continue training from a saved checkpoint file
-$cd ./src
-$python deepSpeech_train.py --checkpoint_dir PATH_TO_SAVED_CHECKPOINT_FILE --max_steps 40000
+$ cd ./src
+$ python deepSpeech_train.py --checkpoint_dir PATH_TO_SAVED_CHECKPOINT_FILE --max_steps 40000
 ```
 The script train.sh contains commands to train on utterances in sorted order for the first epoch and then to resume training on shuffled utterances.
 Note that during the first epoch, the cost will increase and it will take longer to train on later steps because the utterances are presented in sorted order to the network.

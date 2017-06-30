@@ -177,7 +177,7 @@ def create_records():
 
 # Audio path is the location of the directory that contains the librispeech
 # data partitioned into three folders: dev-clean, train-clean-100, test-clean
-AUDIO_PATH = '../data/LibriSpeech'
+AUDIO_PATH = '../data/LibriSpeech/audio'
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ' "
 CHAR_TO_IX = {ch: i for (i, ch) in enumerate(ALPHABET)}
 
