@@ -186,7 +186,7 @@ def inference(sess, feats, seq_lens, params):
           cell_list = []
           cell_list.append(MkldnnRNNCell(sess, params.num_hidden, input_size=75 * params.num_filters, use_fp16=params.use_fp16))
           for i in range(params.num_rnn_layers - 1):
-            cell_list.append(MkldnnRNNCell(sess, params.num_hidden, input_size=75 * params.num_hidden, use_fp16=params.use_fp16))
+            cell_list.append(MkldnnRNNCell(sess, params.num_hidden, input_size=params.num_hidden, use_fp16=params.use_fp16))
           multi_cell = tf.contrib.rnn.MultiRNNCell(cell_list)
         else:
           cell = custom_ops.CustomRNNCell2(params.num_hidden, use_fp16=params.use_fp16)
