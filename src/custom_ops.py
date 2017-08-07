@@ -3,11 +3,12 @@ Custom RNN Cell definition.
 Default RNNCell in TensorFlow throws errors when
 variables are re-used between devices.
 """
+import tensorflow as tf
 
 from tensorflow.contrib.rnn import BasicRNNCell
 from tensorflow.python.util import nest
-import tensorflow as tf
 from tensorflow.python.training import moving_averages
+from tensorflow.contrib.mkldnn_rnn.python.ops import mkldnn_rnn_ops
 
 from helper_routines import _variable_on_cpu
 
@@ -19,7 +20,7 @@ class CustomRNNCell(BasicRNNCell):
     pin weights on one device (say cpu).
     """
 
-    def __init__(self, num_units, activation = tf.nn.relu6, use_fp16 = False):
+    def __init__(self, num_units, input_size=None, activation=tf.nn.relu6, use_fp16=False):
         self._num_units = num_units
         self._activation = activation
         self.use_fp16 = use_fp16
@@ -41,7 +42,7 @@ class CustomRNNCell2(BasicRNNCell):
     pin weights on one device (say cpu).
     """
 
-    def __init__(self, num_units, activation = tf.nn.relu6, use_fp16 = False):
+    def __init__(self, num_units, input_size=None, activation=tf.nn.relu6, use_fp16=False):
         self._num_units = num_units
         self.use_fp16 = use_fp16
 
@@ -57,19 +58,52 @@ class CustomRNNCell2(BasicRNNCell):
             # print "rnn cell input size: ", inputs.get_shape().as_list()
             # print "rnn cell state size: ", state.get_shape().as_list()
             wsize = inputs.get_shape()[1]
-            w = _variable_on_cpu('W', [self._num_units, wsize], use_fp16 = self.use_fp16)
-            resi = tf.matmul(inputs, w, transpose_a = False, transpose_b = True)
+            w = _variable_on_cpu('W', [self._num_units, wsize], use_fp16=self.use_fp16)
+            resi = tf.matmul(inputs, w, transpose_a=False, transpose_b=True)
             # batch_size * num_units
             bn_resi = seq_batch_norm(resi)
             # bn_resi = resi
             usize = state.get_shape()[1]
-            u = _variable_on_cpu('U', [self._num_units, usize], use_fp16 = self.use_fp16)
-            resu = tf.matmul(state, u, transpose_a = False, transpose_b = True)
+            u = _variable_on_cpu('U', [self._num_units, usize], use_fp16=self.use_fp16)
+            resu = tf.matmul(state, u, transpose_a=False, transpose_b=True)
             bias = _variable_on_cpu('B', [self._num_units],
                                      tf.constant_initializer(0),
-                                     use_fp16 = self.use_fp16)
-            output = relux(tf.add(bn_resi, resu) + bias, capping = 20)
+                                     use_fp16=self.use_fp16)
+            output = relux(tf.add(bn_resi, resu) + bias, capping=20)
         return output, output
+
+
+class MkldnnRNNCell(BasicRNNCell):
+    """ This is a MkldnnRNNCell based on MKLDNN engine. The Matrix of weights is
+    set using _variable_on_cpu.
+    The default version of the BasicRNNCell, did not support the ability to
+    pin weights on one device (say cpu).
+    """
+
+    def __init__(self, sess, num_units, input_size = None, activation=tf.nn.relu6, use_fp16=False):
+        self._num_units = num_units
+        self.use_fp16 = use_fp16
+        self.model = mkldnn_rnn_ops.MkldnnRNNRelu(1, self._num_units, input_size, dropout=0.0)
+        param_size_t = self.model.params_size()
+        if sess is not None:
+          self.param_size = sess.run(param_size_t)
+        # print "param size: ", self.param_size
+
+    def __call__(self, inputs, state, scope=None, weight_size=None):
+        with tf.variable_scope(scope or type(self).__name__):
+          # if len(inputs.get_shape()) == 2:
+          #   inputs = tf.expand_dims(inputs, axis=0)
+          # state = tf.expand_dims(state, axis=0)
+          # print "input size: ", inputs.get_shape(), " state size: ", state.get_shape()
+          rnn_weights = _variable_on_cpu("rnn_weights", [self.param_size], tf.constant_initializer(1.0 / self.param_size), self.use_fp16)
+          output, output_h = self.model(input_data=inputs,
+                                        input_h=state,
+                                        params=rnn_weights,
+                                        is_training=True)
+          # print "output size: ", output.get_shape(), "output h size: ", output_h.get_shape()
+          # output = tf.squeeze(output, axis=0)
+          # output_h = tf.squeeze(output_h, axis=0)
+        return output, output_h
 
 
 def stacked_brnn(cell, num_units, num_layers, inputs, seq_lengths, batch_size):

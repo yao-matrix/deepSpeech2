@@ -79,6 +79,9 @@ def parse_args():
     parser.add_argument('--train_dir', type = str,
                         default = '../models/librispeech/train',
                         help = 'Directory to write event logs and checkpoints')
+    parser.add_argument('--platform', type = str,
+                        default = 'knl',
+                        help = 'running platform: knl or bdw')
     parser.add_argument('--data_dir', type = str,
                         default = '',
                         help = 'Path to the audio data directory')
@@ -115,8 +118,8 @@ def parse_args():
                         help = 'Number of recurrent layers')
     parser.add_argument('--checkpoint', type = str, default = None,
                         help = 'Continue training from checkpoint file')
-    parser.add_argument('--rnn_type', type = str, default = 'bi-dir',
-                        help = 'uni-dir or bi-dir')
+    parser.add_argument('--rnn_type', type = str, default = 'didirectional',
+                        help = 'unidirectional or bidirectional')
     parser.add_argument('--initial_lr', type = float, default = 0.00001,
                         help = 'Initial learning rate for training')
     parser.add_argument('--num_filters', type = int, default = 32,
@@ -131,6 +134,8 @@ def parse_args():
                         help = 'Intra op thread num')
     parser.add_argument('--inter_op', type = int, default = 1,
                         help = 'Inter op thread num')
+    parser.add_argument('--engine', type = str, default = 'rnn',
+                        help = 'Select the engine you use')
  
     args = parser.parse_args()
 
@@ -150,10 +155,11 @@ def parse_args():
             args.temporal_stride = params['temporal_stride']
             args.initial_lr = params['initial_lr']
             args.num_gpus = params['num_gpus']
+            args.engine = params['engine']
     return args
 
 
-def tower_loss(scope, feats, labels, seq_lens):
+def tower_loss(sess, scope, feats, labels, seq_lens):
     """Calculate the total loss on a single tower running the deepSpeech model.
 
     This function builds the graph for computing the loss per tower(GPU).
@@ -172,7 +178,7 @@ def tower_loss(scope, feats, labels, seq_lens):
     """
 
     # Build inference Graph.
-    logits = deepSpeech.inference(feats, seq_lens, ARGS)
+    logits = deepSpeech.inference(sess, feats, seq_lens, ARGS)
 
     # Build the portion of the Graph calculating the losses. Note that we will
     # assemble the total_loss using a custom function below.
@@ -289,7 +295,7 @@ def fetch_data():
     return split_feats, split_labels, split_seq_lens
 
 
-def get_loss_grads(data, optimizer):
+def get_loss_grads(sess, data, optimizer):
     """ Set up loss and gradient ops.
     Add summaries to trainable variables """
 
@@ -304,7 +310,7 @@ def get_loss_grads(data, optimizer):
                     # Calculate the loss for one tower of the deepSpeech model.
                     # This function constructs the entire deepSpeech model
                     # but shares the variables across all towers.
-                    loss = tower_loss(scope, feats[i], labels[i], seq_lens[i])
+                    loss = tower_loss(sess, scope, feats[i], labels[i], seq_lens[i])
 
                     # Reuse variables for the next tower.
                     tf.get_variable_scope().reuse_variables()
@@ -330,7 +336,7 @@ def run_train_loop(sess, operations, saver):
     run_metadata = None
     trace_file = None
     if DEBUG:
-        run_options = tf.RunOptions(trace_level = tf.RunOptions.FULL_TRACE)
+        run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         run_metadata = tf.RunMetadata()
         trace_file = open('profiling.json', 'w')
 
@@ -343,15 +349,15 @@ def run_train_loop(sess, operations, saver):
             data_gen_time = time.time()
             # labels_val = labels.eval(session = sess)
             dummy_input_duration = data_gen_time - start_time
-            _, loss_value = sess.run([train_op, loss_op], options = run_options, run_metadata = run_metadata, 
-                                     feed_dict = {feats_batch: feats,
+            _, loss_value = sess.run([train_op, loss_op], options=run_options, run_metadata=run_metadata,
+                                     feed_dict={feats_batch: feats,
                                                   idx_batch: idx, 
                                                   vals_batch: vals,
                                                   shape_batch: shape,
                                                   seq_lens_batch: seq_lens
-                                                 })
+                                                })
         else:
-            _, loss_value = sess.run([train_op, loss_op], options = run_options, run_metadata = run_metadata)
+            _, loss_value = sess.run([train_op, loss_op], options=run_options, run_metadata=run_metadata)
  
 
         duration = time.time() - start_time
@@ -473,8 +479,17 @@ def train():
             split_seq_lens = tf.split(seq_lens_batch, ARGS.num_gpus, 0)
             data = [split_feats, split_labels, split_seq_lens]
 
+        # Start running operations on the Graph. allow_soft_placement
+        # must be set to True to build towers on GPU, as some of the
+        # ops do not have GPU implementations.
+        sess = tf.Session(config = tf.ConfigProto(
+            allow_soft_placement = True,
+            log_device_placement = ARGS.log_device_placement,
+            inter_op_parallelism_threads = ARGS.inter_op,
+            intra_op_parallelism_threads = ARGS.intra_op))
+
         # Construct loss and gradient ops
-        loss_op, tower_grads, summaries = get_loss_grads(data, optimizer)
+        loss_op, tower_grads, summaries = get_loss_grads(sess, data, optimizer)
 
         # We must calculate the mean of each gradient. Note that this is the
         # synchronization point across all towers.
@@ -500,15 +515,6 @@ def train():
         # Create a saver.
         saver = tf.train.Saver(tf.global_variables(), max_to_keep = 100)
 
-        # Start running operations on the Graph. allow_soft_placement
-        # must be set to True to build towers on GPU, as some of the
-        # ops do not have GPU implementations.
-        sess = tf.Session(config = tf.ConfigProto(
-            allow_soft_placement = True,
-            log_device_placement = ARGS.log_device_placement,
-            inter_op_parallelism_threads = ARGS.inter_op,
-            intra_op_parallelism_threads = ARGS.intra_op))
-            
         # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
         # sess.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
 
@@ -544,15 +550,15 @@ def main():
     # in-case the network training resumes at a later time.
     with open(os.path.join(ARGS.train_dir,
                            'deepSpeech_parameters.json'), 'w') as outfile:
-        json.dump(vars(ARGS), outfile, sort_keys = True, indent = 4)
+        json.dump(vars(ARGS), outfile, sort_keys=True, indent=4)
 
     args = setenvs(sys.argv)
-    print('Running on CPU: ', args.cpu)
+    print('Running on platform: ', args.platform)
   
-    if args.cpu == 'bdw':
-        ARGS.intra_op = 44
-        ARGS.inter_op = 1
-    elif args.cpu == 'knl':
+    if args.platform == 'bdw':
+        ARGS.intra_op = 8
+        ARGS.inter_op = 5
+    elif args.platform == 'knl':
         ARGS.intra_op = 8
         ARGS.inter_op = 8
 

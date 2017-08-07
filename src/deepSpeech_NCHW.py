@@ -27,6 +27,10 @@ import deepSpeech_dummy
 
 import custom_ops
 
+from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import variables
+from tensorflow.python.ops import math_ops
+from tensorflow.python.ops import gradients_impl
 from helper_routines import _variable_on_cpu
 from helper_routines import _variable_with_weight_decay
 from helper_routines import _activation_summary
@@ -46,6 +50,7 @@ def get_rnn_seqlen(seq_lens):
     rnn_seq_lens = tf.div(tf.subtract(rnn_seq_lens, 9), 2.0)
     rnn_seq_lens = tf.ceil(rnn_seq_lens)
     rnn_seq_lens = tf.cast(rnn_seq_lens, tf.int32)
+
     # rnn_seq_lens = tf.Print(rnn_seq_lens, [rnn_seq_lens], "Conved seq len: ", 32)
     # print "rnn_seq_lens shape: ", rnn_seq_lens.get_shape().as_list()
     return rnn_seq_lens
@@ -81,7 +86,7 @@ def inputs(eval_data, data_dir, batch_size, use_fp16, shuffle):
     return feats, labels, seq_lens
 
 
-def inference(feats, seq_lens, params):
+def inference(sess, feats, seq_lens, params):
     """Build the deepSpeech model.
 
     Args:
@@ -166,32 +171,39 @@ def inference(feats, seq_lens, params):
     # conv2 = tf.Print(conv2, [conv2.get_shape()], "Conved Tensor Shape: ")
     with tf.variable_scope('rnn') as scope:
         # N, C, T, F => T, N, C, F
-        rnn_input1 = tf.transpose(conv2, perm = [2, 0, 1, 3])
+        rnn_input1 = tf.transpose(conv2, perm=[2, 0, 1, 3])
         # Reshape conv output to fit rnn input: T, N, 32 * F
         rnn_input = tf.reshape(rnn_input1, [-1, params.batch_size, 75 * params.num_filters])
         # Make one instance of cell on a fixed device,
         # and use copies of the weights on other devices.
-        cell = custom_ops.CustomRNNCell2(
-            params.num_hidden,
-            use_fp16 = params.use_fp16)
-        multi_cell = tf.contrib.rnn.MultiRNNCell([cell] * params.num_rnn_layers)
+        multi_cell = None
+        if params.engine == 'MKLDNN_RNN' or params.engine == 'CUDNN_RNN':
+          cell_list = []
+          cell_list.append(custom_ops.MkldnnRNNCell(sess, params.num_hidden, input_size=75 * params.num_filters, use_fp16=params.use_fp16))
+          for i in range(params.num_rnn_layers - 1):
+            cell_list.append(custom_ops.MkldnnRNNCell(sess, params.num_hidden, input_size=75 * params.num_hidden, use_fp16=params.use_fp16))
+          multi_cell = tf.contrib.rnn.MultiRNNCell(cell_list)
+        else:
+          cell = custom_ops.CustomRNNCell2(params.num_hidden, use_fp16=params.use_fp16)
+          multi_cell = tf.contrib.rnn.MultiRNNCell([cell] * params.num_rnn_layers)
 
         rnn_seq_lens = get_rnn_seqlen(seq_lens)
-        if params.rnn_type == 'uni-dir':
-            rnn_outputs, _ = tf.nn.dynamic_rnn(multi_cell, rnn_input,
-                                               sequence_length = rnn_seq_lens,
-                                               dtype = dtype, time_major = True,
-                                               scope = scope.name,
-                                               swap_memory = False)
+        if params.rnn_type == 'unidirectional':
+          rnn_outputs, _ = tf.nn.dynamic_rnn(multi_cell, rnn_input,
+                                             sequence_length=rnn_seq_lens,
+                                             dtype=dtype, time_major=True,
+                                             scope=scope.name,
+                                             swap_memory=False)
         else:
-            outputs, _ = tf.nn.bidirectional_dynamic_rnn(
-                multi_cell, multi_cell, rnn_input,
-                sequence_length = rnn_seq_lens, dtype = dtype,
-                time_major = True, scope = scope.name,
-                swap_memory = False)
-            outputs_fw, outputs_bw = outputs
-            rnn_outputs = outputs_fw + outputs_bw
+          outputs, _ = tf.nn.bidirectional_dynamic_rnn(multi_cell, multi_cell, rnn_input,
+                                                       sequence_length=rnn_seq_lens, dtype=dtype,
+                                                       time_major=True, scope=scope.name,
+                                                       swap_memory=False)
+          outputs_fw, outputs_bw = outputs
+          rnn_outputs = outputs_fw + outputs_bw
         _activation_summary(rnn_outputs)
+
+    # print "rnn output:", rnn_outputs.get_shape()
 
     # Linear layer(WX + b) - softmax is applied by CTC cost function.
     with tf.variable_scope('softmax_linear') as scope:
@@ -202,7 +214,7 @@ def inference(feats, seq_lens, params):
         biases = _variable_on_cpu('biases', [NUM_CLASSES],
                                   tf.constant_initializer(0.0),
                                   params.use_fp16)
-        logit_inputs = tf.reshape(rnn_outputs, [-1, cell.output_size])
+        logit_inputs = tf.reshape(rnn_outputs, [-1, params.num_hidden])
         logits = tf.add(tf.matmul(logit_inputs, weights, transpose_a = False, transpose_b = True),
                         biases, name = scope.name)
         logits = tf.reshape(logits, [-1, params.batch_size, NUM_CLASSES])

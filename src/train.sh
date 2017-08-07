@@ -28,7 +28,9 @@ echo "-----------------------------------"
 echo "Start training"
 filename='../models/librispeech/train'
 datadir='../data/LibriSpeech/processed/'
-python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --train_dir $filename --data_dir $datadir --num_gpus 1
+# engine='CUDNN_RNN'
+# engine='MKLDNN_RNN'
+python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'unidirectional' --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --train_dir $filename --data_dir $datadir --num_gpus 1
 
 # deactivate Intel Python
 # source /opt/intel/intelpython2/bin/deactivate

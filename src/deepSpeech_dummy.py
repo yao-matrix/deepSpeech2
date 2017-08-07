@@ -22,6 +22,7 @@ g_size = 0
 g_duration = 0
 g_current = 0
 
+
 NUM_CLASSES = 29
 NUM_PER_EPOCH_FOR_TRAIN = sum(counts) * scale_factor
 # NUM_PER_EPOCH_FOR_TRAIN = 28535
