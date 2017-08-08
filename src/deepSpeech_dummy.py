@@ -83,9 +83,7 @@ def _next(batch_size):
         label[x] = random.randint(0, NUM_CLASSES - 2)
     label[label_length - 1] = NUM_CLASSES - 1
     feat = g_randomness[start_idx : end_idx, :]
-    # print input.shape
-    # print utt_length
-    # print label
+
     return utt_length, feat, label
 
 def _dense_to_sparse(dense):
