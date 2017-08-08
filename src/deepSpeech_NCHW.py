@@ -22,25 +22,30 @@ Summary of major functions:
 
 import tensorflow as tf
 
-import deepSpeech_input
-import deepSpeech_dummy
-
-import custom_ops
-
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import variables
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import gradients_impl
+
 from helper_routines import _variable_on_cpu
 from helper_routines import _variable_with_weight_decay
 from helper_routines import _activation_summary
+import custom_ops
+import deepSpeech_input
+import deepSpeech_dummy
+
+try:
+  from tensorflow.contrib.mkldnn_rnn.python.ops import mkldnn_rnn_ops
+except ImportError:
+  print("mkldnn_rnn module does NOT exist, cannot use mkldnn_rnn cell, but you can use other cells")
+else:
+  from mkldnn_rnn_op import MkldnnRNNCell
 
 # Global constants describing the speech data set.
 NUM_CLASSES = deepSpeech_input.NUM_CLASSES
 NUM_PER_EPOCH_FOR_TRAIN = deepSpeech_input.NUM_PER_EPOCH_FOR_TRAIN
 NUM_PER_EPOCH_FOR_EVAL = deepSpeech_input.NUM_PER_EPOCH_FOR_EVAL
 NUM_PER_EPOCH_FOR_TEST = deepSpeech_input.NUM_PER_EPOCH_FOR_TEST
-
 
 def get_rnn_seqlen(seq_lens):
     # seq_lens = tf.Print(seq_lens, [seq_lens], "Original seq len: ", 32)
@@ -179,9 +184,9 @@ def inference(sess, feats, seq_lens, params):
         multi_cell = None
         if params.engine == 'MKLDNN_RNN' or params.engine == 'CUDNN_RNN':
           cell_list = []
-          cell_list.append(custom_ops.MkldnnRNNCell(sess, params.num_hidden, input_size=75 * params.num_filters, use_fp16=params.use_fp16))
+          cell_list.append(MkldnnRNNCell(sess, params.num_hidden, input_size=75 * params.num_filters, use_fp16=params.use_fp16))
           for i in range(params.num_rnn_layers - 1):
-            cell_list.append(custom_ops.MkldnnRNNCell(sess, params.num_hidden, input_size=75 * params.num_hidden, use_fp16=params.use_fp16))
+            cell_list.append(MkldnnRNNCell(sess, params.num_hidden, input_size=75 * params.num_hidden, use_fp16=params.use_fp16))
           multi_cell = tf.contrib.rnn.MultiRNNCell(cell_list)
         else:
           cell = custom_ops.CustomRNNCell2(params.num_hidden, use_fp16=params.use_fp16)
