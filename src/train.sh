@@ -27,7 +27,7 @@ unset TF_CPP_MIN_VLOG_LEVEL
 echo "-----------------------------------"
 echo "Start training"
 
-dummy=true
+dummy=false
 nchw=true
 debug=true
 engine="mkl" # tf, mkl, cudnn_rnn, mkldnn_rnn

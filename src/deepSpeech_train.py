@@ -130,7 +130,6 @@ else:
 
 g = tf.Graph()
 if ARGS.dummy:
-    print "dummy"
     with g.as_default():
         feats_batch = tf.placeholder(dtype=tf.float32, shape=[None, None, deepSpeech_dummy.freq_bins])
         idx_batch = tf.placeholder(dtype=tf.int64)
@@ -308,7 +307,7 @@ def run_train_loop(sess, operations, saver):
     run_options = None
     run_metadata = None
     trace_file = None
-    if DEBUG:
+    if ARGS.debug:
         run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         run_metadata = tf.RunMetadata()
         trace_file = open('profiling.json', 'w')
@@ -317,7 +316,7 @@ def run_train_loop(sess, operations, saver):
     for step in range(ARGS.max_steps):
         start_time = time.time()
         
-        if DUMMY:
+        if ARGS.dummy:
             feats, idx, vals, shape, seq_lens = deepSpeech_dummy.inputs(ARGS.batch_size)
             data_gen_time = time.time()
 
@@ -342,7 +341,7 @@ def run_train_loop(sess, operations, saver):
         # Print progress periodically
         if step > 10 and step % 10 == 0:
             examples_per_sec = (ARGS.batch_size * 1) / np.average(profiling)
-            if DUMMY:
+            if ARGS.dummy:
                 format_str = ('%s: step %d, '
                               'loss = %.2f (%.1f examples/sec; %.3f '
                               'sec/batch; '
@@ -358,38 +357,38 @@ def run_train_loop(sess, operations, saver):
                                     examples_per_sec, np.average(profiling) / 1))
 
         # Run the summary ops periodically
-        if step % 50 == 0 and not DUMMY:
+        if step % 50 == 0 and not ARGS.debug:
             summary_writer = tf.summary.FileWriter(ARGS.train_dir, sess.graph)
             summary_writer.add_summary(sess.run(summary_op), step)
 
         # Save the model checkpoint periodically
         if step % 1000 == 0 or (step + 1) == ARGS.max_steps:
             checkpoint_path = os.path.join(ARGS.train_dir, 'model.ckpt')
-            saver.save(sess, checkpoint_path, global_step = step)
+            saver.save(sess, checkpoint_path, global_step=step)
 
-        if DEBUG and step == 20:
+        if ARGS.debug and step == 20:
             trace = timeline.Timeline(run_metadata.step_stats)
             trace_file.write(trace.generate_chrome_trace_format())
 
             prof_options = tf.contrib.tfprof.model_analyzer.TRAINABLE_VARS_PARAMS_STAT_OPTIONS
-            prof_options['dump_to_file'] = "./params.log"
+            prof_options['output'] = "file:outfile=./params.log"
             param_stats = tf.contrib.tfprof.model_analyzer.print_model_analysis(tf.get_default_graph(),
-                                                                                tfprof_options = prof_options)
+                                                                                tfprof_options=prof_options)
             # sys.stdout.write('total_params: %d\n' % param_stats.total_parameters)
 
             prof_options = tf.contrib.tfprof.model_analyzer.FLOAT_OPS_OPTIONS
-            prof_options['dump_to_file'] = "./flops.log"
+            prof_options['output'] = "file:outfile=./flops.log"
             tf.contrib.tfprof.model_analyzer.print_model_analysis(tf.get_default_graph(),
-                                                                  run_meta = run_metadata,
-                                                                  tfprof_options = prof_options)
+                                                                  run_meta=run_metadata,
+                                                                  tfprof_options=prof_options)
 
             prof_options = tf.contrib.tfprof.model_analyzer.PRINT_ALL_TIMING_MEMORY
-            prof_options['dump_to_file'] = "./timing_memory.log"
+            prof_options['output'] = "file:outfile=./timing_memory.log"
             prof_options['start_name_regexes'] = "ctc_loss"
             tf.contrib.tfprof.model_analyzer.print_model_analysis(tf.get_default_graph(),
-                                                                  tfprof_cmd = 'graph',
-                                                                  run_meta = run_metadata,
-                                                                  tfprof_options = prof_options)
+                                                                  tfprof_cmd='graph',
+                                                                  run_meta=run_metadata,
+                                                                  tfprof_options=prof_options)
 
 
 def initialize_from_checkpoint(sess, saver):

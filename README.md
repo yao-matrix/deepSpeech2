@@ -47,8 +47,9 @@ $ pip install --upgrade 'tensorflow-gpu==1.1.0'
 Preprocessing the data
 ----------------------
 *Step 1: Download and unpack the LibriSpeech data*
-```
+
 Inside the github repo that you have cloned run:
+```shell
 $ mkdir -p data/librispeech
 $ cd data/librispeech
 $ wget http://www.openslr.org/resources/12/train-clean-100.tar.gz
@@ -59,6 +60,9 @@ $ cd audio
 $ tar xvzf ../train-clean-100.tar.gz LibriSpeech/train-clean-100 --strip-components=1
 $ tar xvzf ../dev-clean.tar.gz LibriSpeech/dev-clean  --strip-components=1
 $ tar xvzf ../test-clean.tar.gz LibriSpeech/test-clean  --strip-components=1
+# delete audios that is too short
+$ rm -rf LibriSpeech/train-clean-100/1578/6379/1578-6379-0029.flac
+$ rm -rf LibriSpeech/train-clean-100/460/172359/460-172359-0090.flac
 ```
 *Step 2: Run this command to preprocess the audio and generate TFRecord files.*
 
@@ -72,7 +76,9 @@ Training a model w/ dummy data
 ----------------
 ```
 $ cd ./src
-$ . ./train.sh
+$ vim ./train.sh
+# let dummy=true in train.sh
+$ ./train.sh
 ```
 
 Training a model w/ real data
@@ -80,7 +86,9 @@ Training a model w/ real data
 ```
 # To continue training from a saved checkpoint file
 $ cd ./src
-$ python deepSpeech_train.py --checkpoint_dir PATH_TO_SAVED_CHECKPOINT_FILE --max_steps 40000
+$ vim ./train.sh
+# let dummpy=false in train.sh
+$ ./train.sh
 ```
 The script train.sh contains commands to train on utterances in sorted order for the first epoch and then to resume training on shuffled utterances.
 Note that during the first epoch, the cost will increase and it will take longer to train on later steps because the utterances are presented in sorted order to the network.
