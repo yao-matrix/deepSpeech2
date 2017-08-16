@@ -26,11 +26,36 @@ unset TF_CPP_MIN_VLOG_LEVEL
 # clear
 echo "-----------------------------------"
 echo "Start training"
-filename='../models/librispeech/train'
-datadir='../data/LibriSpeech/processed/'
-# engine='CUDNN_RNN'
-# engine='MKLDNN_RNN'
-python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'unidirectional' --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --train_dir $filename --data_dir $datadir --num_gpus 1
+
+dummy=true
+nchw=true
+debug=true
+engine="mkl" # tf, mkl, cudnn_rnn, mkldnn_rnn
+
+if [[ ${dummy} ]]
+then
+	if [[ !${nchw} && (${engine} == "tf" || ${engine} == "cudnn_rnn") ]];then
+		python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --dummy ${dummy} --debug ${debug} --nchw ${nchw} --engine ${engine}
+	elif [[ ${nchw} && (${engine} == "mkl" || ${engine} == "mkldnn_rnn") ]];then
+		python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --dummy ${dummy} --debug ${debug} --nchw ${nchw} --engine ${engine}
+	else
+		echo "unsupported parameter combination"
+	fi
+fi
+
+if [[ !${dummy} ]]
+then
+	filename='../models/librispeech/train'
+	datadir='../data/LibriSpeech/processed/'
+	if [[ !${nchw} && (${engine} == "tf" || ${engine} == "cudnn_rnn") ]];then
+		python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --train_dir $filename --data_dir $datadir --debug ${debug} --nchw ${nchw} --engine ${engine}
+	elif [[ ${nchw} && (${engine} == "mkl" || ${engine} == "mkldnn_rnn") ]];then
+		python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --train_dir $filename --data_dir $datadir --debug ${debug} --nchw ${nchw} --engine ${engine}
+	else
+		echo "unsupported parameter combination"
+	fi
+fi
+echo "Done"
 
 # deactivate Intel Python
 # source /opt/intel/intelpython2/bin/deactivate
@@ -40,6 +65,3 @@ python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_
 # echo "Training now on dummy data"
 # filename='../models/dummy/train'
 # python deepSpeech_train.py --batch_size 32 --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --num_filters 32 --checkpoint ../models/dummy --train_dir $filename
-
-
-

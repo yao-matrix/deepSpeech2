@@ -181,19 +181,17 @@ def inference(sess, feats, seq_lens, params):
         rnn_input = tf.reshape(rnn_input1, [-1, params.batch_size, 75 * params.num_filters])
         # Make one instance of cell on a fixed device,
         # and use copies of the weights on other devices.
-        multi_cell = None
+        cell_list = []
         if params.engine == 'MKLDNN_RNN' or params.engine == 'CUDNN_RNN':
-          cell_list = []
           cell_list.append(MkldnnRNNCell(sess, params.num_hidden, input_size=75 * params.num_filters, use_fp16=params.use_fp16))
           for i in range(params.num_rnn_layers - 1):
             cell_list.append(MkldnnRNNCell(sess, params.num_hidden, input_size=params.num_hidden, use_fp16=params.use_fp16))
-          multi_cell = tf.contrib.rnn.MultiRNNCell(cell_list)
         else:
           cell = custom_ops.CustomRNNCell2(params.num_hidden, use_fp16=params.use_fp16)
-          multi_cell = tf.contrib.rnn.MultiRNNCell([cell] * params.num_rnn_layers)
+          cell_list = [cell] * params.num_rnn_layers
 
         rnn_seq_lens = get_rnn_seqlen(seq_lens)
-        rnn_outputs = custom_ops.stacked_brnn(multi_cell, multi_cell, params.num_hidden, params.num_rnn_layers, rnn_input, rnn_seq_lens, params.batch_size)
+        rnn_outputs = custom_ops.stacked_brnn(cell_list, cell_list, params.num_hidden, params.num_rnn_layers, rnn_input, rnn_seq_lens, params.batch_size)
         _activation_summary(rnn_outputs)
 
     # print "rnn output:", rnn_outputs.get_shape()
@@ -208,8 +206,8 @@ def inference(sess, feats, seq_lens, params):
                                   tf.constant_initializer(0.0),
                                   params.use_fp16)
         logit_inputs = tf.reshape(rnn_outputs, [-1, params.num_hidden])
-        logits = tf.add(tf.matmul(logit_inputs, weights, transpose_a = False, transpose_b = True),
-                        biases, name = scope.name)
+        logits = tf.add(tf.matmul(logit_inputs, weights, transpose_a=False, transpose_b=True),
+                        biases, name=scope.name)
         logits = tf.reshape(logits, [-1, params.batch_size, NUM_CLASSES])
         _activation_summary(logits)
 
@@ -236,13 +234,13 @@ def loss(logits, labels, seq_lens):
     # print "seq len[after]: ", seq_lens
 
     # Calculate the average ctc loss across the batch.
-    ctc_loss = tf.nn.ctc_loss(labels = labels, inputs = tf.cast(logits, tf.float32), sequence_length = seq_lens, preprocess_collapse_repeated = True, time_major = True)
-    ctc_loss_mean = tf.reduce_mean(ctc_loss, name = 'ctc_loss')
+    ctc_loss = tf.nn.ctc_loss(labels=labels, inputs=tf.cast(logits, tf.float32), sequence_length=seq_lens, preprocess_collapse_repeated=True, time_major=True)
+    ctc_loss_mean = tf.reduce_mean(ctc_loss, name='ctc_loss')
     tf.add_to_collection('losses', ctc_loss_mean)
 
     # The total loss is defined as the cross entropy loss plus all
     # of the weight decay terms (L2 loss).
-    return tf.add_n(tf.get_collection('losses'), name = 'total_loss')
+    return tf.add_n(tf.get_collection('losses'), name='total_loss')
 
 
 def _add_loss_summaries(total_loss):

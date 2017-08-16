@@ -4,8 +4,7 @@
 # Email: yaoweifeng0301@126.com
 
 
-"""A script to train a deepSpeech model on LibriSpeech data using multiple GPUs
-with synchronous updates (data parallel training).
+"""A script to train a deepSpeech model on LibriSpeech data.
 
 References:
 1. Hannun, Awni, et al. "Deep speech: Scaling up end-to-end
@@ -13,24 +12,8 @@ speech recognition." arXiv preprint arXiv:1412.5567 (2014).
 2. Amodei, Dario, et al. "Deep speech 2: End-to-end
  speech recognition in english and mandarin."
  arXiv preprint arXiv:1512.02595 (2015).
-
-Accuracy:
-deepSpeech_multi_gpu_train.py achieves 15% CER on LibriSpeech data
-after 30k steps (~100 epochs of data) as judged by deepSpeech_test.py.
-
-Speed: With batch_size 128.
-
-System             | Step Time (sec/batch)  |     Loss
---------------------------------------------------------------------
-3 TitanX Pascal    | 0.25-1.45              | < 20 at 20K steps    (32 hours)
-
-
-Usage:
-Please see the tutorial and website for how to download the LibriSpeech
-data set and train the model.
-
-http://github.com/fordspeech/deepSpeech
 """
+
 from datetime import datetime
 import os.path
 import re
@@ -39,42 +22,19 @@ import argparse
 import json
 import sys
 import numpy as np
+
 import tensorflow as tf
 from tensorflow.python.client import device_lib
 from tensorflow.python.client import timeline
-import helper_routines
-import deepSpeech_dummy
 from tensorflow.python import debug as tf_debug
 
-DEBUG = False
-NCHW = False
-DUMMY = True
-
-if NCHW is True:
-  import deepSpeech_NCHW as deepSpeech
-else:
-  import deepSpeech
-
+import helper_routines
+import deepSpeech_dummy
 from setenvs import setenvs
 from setenvs import arglist
-args = arglist()
-
-profiling = []
-
-g = tf.Graph()
-if DUMMY:
-    with g.as_default():
-        feats_batch = tf.placeholder(dtype = tf.float32, shape = [None, None, deepSpeech_dummy.freq_bins])
-        idx_batch = tf.placeholder(dtype = tf.int64)
-        vals_batch = tf.placeholder(dtype = tf.int64)
-        shape_batch = tf.placeholder(dtype = tf.int64)
-        # labels_batch = tf.sparse_placeholder(dtype = tf.int32)
-        seq_lens_batch = tf.placeholder(dtype = tf.int32, shape = [None])
 
 def parse_args():
     " Parses command line arguments."
-    num_gpus = len([x for x in device_lib.list_local_devices()
-                    if x.device_type == "GPU"])
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_dir', type = str,
                         default = '../models/librispeech/train',
@@ -87,8 +47,6 @@ def parse_args():
                         help = 'Path to the audio data directory')
     parser.add_argument('--max_steps', type = int, default = 20000,
                         help = 'Number of batches to run')
-    parser.add_argument('--num_gpus', type = int, default = num_gpus,
-                        help = 'How many GPUs to use')
     parser.add_argument('--log_device_placement', type = bool, default = False,
                         help = 'Whether to log device placement')
     parser.add_argument('--batch_size', type = int, default = 32,
@@ -134,8 +92,14 @@ def parse_args():
                         help = 'Intra op thread num')
     parser.add_argument('--inter_op', type = int, default = 1,
                         help = 'Inter op thread num')
-    parser.add_argument('--engine', type = str, default = 'rnn',
-                        help = 'Select the engine you use')
+    parser.add_argument('--engine', type = str, default = 'tf',
+                        help = 'Select the engine you use: tf, mkl, mkldnn_rnn, cudnn_rnn')
+    parser.add_argument('--debug', type = bool, default = False,
+                        help = 'Switch on to enable debug log')
+    parser.add_argument('--nchw', type = bool, default = True,
+                        help = 'Whether to use nchw memory layout')
+    parser.add_argument('--dummy', type = bool, default = True,
+                        help = 'Whether to use dummy data rather than librispeech data')
  
     args = parser.parse_args()
 
@@ -154,10 +118,28 @@ def parse_args():
             args.use_fp16 = params['use_fp16']
             args.temporal_stride = params['temporal_stride']
             args.initial_lr = params['initial_lr']
-            args.num_gpus = params['num_gpus']
             args.engine = params['engine']
     return args
 
+ARGS = parse_args()
+
+if ARGS.nchw is True:
+  import deepSpeech_NCHW as deepSpeech
+else:
+  import deepSpeech
+
+g = tf.Graph()
+if ARGS.dummy:
+    print "dummy"
+    with g.as_default():
+        feats_batch = tf.placeholder(dtype=tf.float32, shape=[None, None, deepSpeech_dummy.freq_bins])
+        idx_batch = tf.placeholder(dtype=tf.int64)
+        vals_batch = tf.placeholder(dtype=tf.int64)
+        shape_batch = tf.placeholder(dtype=tf.int64)
+        # labels_batch = tf.sparse_placeholder(dtype=tf.int32)
+        seq_lens_batch = tf.placeholder(dtype=tf.int32, shape=[None])
+
+profiling = []
 
 def tower_loss(sess, scope, feats, labels, seq_lens):
     """Calculate the total loss on a single tower running the deepSpeech model.
@@ -255,10 +237,10 @@ def set_learning_rate():
     """ Set up learning rate schedule """
 
     # Create a variable to count the number of train() calls.
-    # This equals the number of batches processed * ARGS.num_gpus.
+    # This equals the number of batches processed.
     global_step = tf.get_variable(
         'global_step', [],
-        initializer = tf.constant_initializer(0), trainable = False)
+        initializer=tf.constant_initializer(0), trainable=False)
 
     # Calculate the learning rate schedule.
     num_batches_per_epoch = (deepSpeech.NUM_PER_EPOCH_FOR_TRAIN /
@@ -271,16 +253,14 @@ def set_learning_rate():
         global_step,
         decay_steps,
         ARGS.lr_decay_factor,
-        staircase = True)
+        staircase=True)
 
     return learning_rate, global_step
 
 
 def fetch_data():
     """ Fetch features, labels and sequence_lengths from a common queue."""
-    # print "gpu num: ", ARGS.num_gpus
-
-    tot_batch_size = ARGS.batch_size * ARGS.num_gpus
+    tot_batch_size = ARGS.batch_size * 1
     feats, labels, seq_lens = deepSpeech.inputs(eval_data = 'train',
                                                 data_dir = ARGS.data_dir,
                                                 batch_size = tot_batch_size,
@@ -288,9 +268,9 @@ def fetch_data():
                                                 shuffle = ARGS.shuffle)
 
     # Split features and labels and sequence lengths for each tower
-    split_feats = tf.split(feats, ARGS.num_gpus, 0)
-    split_labels = tf.sparse_split(sp_input = labels, num_split = ARGS.num_gpus, axis = 0)
-    split_seq_lens = tf.split(seq_lens, ARGS.num_gpus, 0)
+    split_feats = tf.split(feats, 1, 0)
+    split_labels = tf.sparse_split(sp_input=labels, num_split=1, axis = 0)
+    split_seq_lens = tf.split(seq_lens, 1, 0)
 
     return split_feats, split_labels, split_seq_lens
 
@@ -303,7 +283,7 @@ def get_loss_grads(sess, data, optimizer):
     [feats, labels, seq_lens] = data
     tower_grads = []
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
-        for i in range(ARGS.num_gpus):
+        for i in range(1):
             with tf.device('/cpu:%d' % i):
                 name_scope = '%s_%d' % (helper_routines.TOWER_NAME, i)
                 with tf.name_scope(name_scope) as scope:
@@ -368,21 +348,21 @@ def run_train_loop(sess, operations, saver):
 
         # Print progress periodically
         if step > 10 and step % 10 == 0:
-            examples_per_sec = (ARGS.batch_size * ARGS.num_gpus) / np.average(profiling)
+            examples_per_sec = (ARGS.batch_size * 1) / np.average(profiling)
             if DUMMY:
                 format_str = ('%s: step %d, '
                               'loss = %.2f (%.1f examples/sec; %.3f '
                               'sec/batch; '
                               '%.3f dummy sec/batch)')
                 print(format_str % (datetime.now(), step, loss_value,
-                                    examples_per_sec, np.average(profiling) / ARGS.num_gpus,
+                                    examples_per_sec, np.average(profiling) / 1,
                                     dummy_input_duration))
             else:
                 format_str = ('%s: step %d, '
                           'loss = %.2f (%.1f examples/sec; %.3f '
                           'sec/batch)')
                 print(format_str % (datetime.now(), step, loss_value,
-                                    examples_per_sec, np.average(profiling) / ARGS.num_gpus))
+                                    examples_per_sec, np.average(profiling) / 1))
 
         # Run the summary ops periodically
         if step % 50 == 0 and not DUMMY:
@@ -439,7 +419,6 @@ def initialize_from_checkpoint(sess, saver):
 
 def add_summaries(summaries, learning_rate, grads):
     """ Add summary ops"""
-
     # Track quantities for Tensorboard display
     summaries.append(tf.summary.scalar('learning_rate', learning_rate))
     # Add histograms for gradients.
@@ -469,24 +448,24 @@ def train():
         optimizer = tf.train.AdamOptimizer(learning_rate)
 
         # Fetch a batch worth of data for each tower
-        if not DUMMY: 
+        if not ARGS.dummy: 
             data = fetch_data()
         else: 
             # idx, vals, s_shape = deepSpeech_dummy.dense_to_sparse(labels_batch, labels_batch_w, labels_batch_h)
-            labels_batch = tf.SparseTensor(indices = idx_batch, values = vals_batch, dense_shape = shape_batch)
-            split_feats = tf.split(feats_batch, ARGS.num_gpus, 0)
-            split_labels = tf.sparse_split(sp_input = tf.cast(labels_batch, tf.int32), num_split = ARGS.num_gpus, axis = 0)
-            split_seq_lens = tf.split(seq_lens_batch, ARGS.num_gpus, 0)
+            labels_batch = tf.SparseTensor(indices=idx_batch, values=vals_batch, dense_shape=shape_batch)
+            split_feats = tf.split(feats_batch, 1, 0)
+            split_labels = tf.sparse_split(sp_input=tf.cast(labels_batch, tf.int32), num_split=1, axis=0)
+            split_seq_lens = tf.split(seq_lens_batch, 1, 0)
             data = [split_feats, split_labels, split_seq_lens]
 
         # Start running operations on the Graph. allow_soft_placement
         # must be set to True to build towers on GPU, as some of the
         # ops do not have GPU implementations.
         sess = tf.Session(config = tf.ConfigProto(
-            allow_soft_placement = True,
-            log_device_placement = ARGS.log_device_placement,
-            inter_op_parallelism_threads = ARGS.inter_op,
-            intra_op_parallelism_threads = ARGS.intra_op))
+            allow_soft_placement=True,
+            log_device_placement=ARGS.log_device_placement,
+            inter_op_parallelism_threads=ARGS.inter_op,
+            intra_op_parallelism_threads=ARGS.intra_op))
 
         # Construct loss and gradient ops
         loss_op, tower_grads, summaries = get_loss_grads(sess, data, optimizer)
@@ -526,7 +505,7 @@ def train():
             print "does not have checkpoint"
             sess.run(tf.global_variables_initializer())
 
-        if not DUMMY:
+        if not ARGS.dummy:
             # Start the queue runners.
             tf.train.start_queue_runners(sess)
 
@@ -568,5 +547,4 @@ def main():
     train()
 
 if __name__ == '__main__':
-    ARGS = parse_args()
     main()

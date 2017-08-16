@@ -86,9 +86,9 @@ def stacked_brnn(cell_fw, cell_bw, num_units, num_layers, inputs, seq_lengths, b
     inputs = inputs
     for i in range(num_layers):
         with tf.variable_scope(None, default_name = "brnn"):
-            initial_state_fw = cell_fw.zero_state(batch_size, dtype = tf.float32)
-            initial_state_bw = cell_bw.zero_state(batch_size, dtype = tf.float32)
-            (outputs, state) = tf.nn.bidirectional_dynamic_rnn(cell_fw[i], cell_bw[i], _inputs, seq_lengths,
+            initial_state_fw = cell_fw[i].zero_state(batch_size, dtype = tf.float32)
+            initial_state_bw = cell_bw[i].zero_state(batch_size, dtype = tf.float32)
+            (outputs, state) = tf.nn.bidirectional_dynamic_rnn(cell_fw[i], cell_bw[i], inputs, seq_lengths,
                                                               initial_state_fw, initial_state_bw, dtype = tf.float32) 
             outputs_fw, outputs_bw = outputs
             _inputs = outputs_fw + outputs_bw
