@@ -60,7 +60,7 @@ $ cd audio
 $ tar xvzf ../train-clean-100.tar.gz LibriSpeech/train-clean-100 --strip-components=1
 $ tar xvzf ../dev-clean.tar.gz LibriSpeech/dev-clean  --strip-components=1
 $ tar xvzf ../test-clean.tar.gz LibriSpeech/test-clean  --strip-components=1
-# delete audios that is too short
+# delete audios which are too short
 $ rm -rf LibriSpeech/train-clean-100/1578/6379/1578-6379-0029.flac
 $ rm -rf LibriSpeech/train-clean-100/460/172359/460-172359-0090.flac
 ```
