@@ -118,7 +118,7 @@ def parse_args():
                         help = 'Number of recurrent layers')
     parser.add_argument('--checkpoint', type = str, default = None,
                         help = 'Continue training from checkpoint file')
-    parser.add_argument('--rnn_type', type = str, default = 'didirectional',
+    parser.add_argument('--rnn_type', type = str, default = 'bidirectional',
                         help = 'unidirectional or bidirectional')
     parser.add_argument('--initial_lr', type = float, default = 0.00001,
                         help = 'Initial learning rate for training')

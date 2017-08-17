@@ -193,19 +193,7 @@ def inference(sess, feats, seq_lens, params):
           multi_cell = tf.contrib.rnn.MultiRNNCell([cell] * params.num_rnn_layers)
 
         rnn_seq_lens = get_rnn_seqlen(seq_lens)
-        if params.rnn_type == 'unidirectional':
-          rnn_outputs, _ = tf.nn.dynamic_rnn(multi_cell, rnn_input,
-                                             sequence_length=rnn_seq_lens,
-                                             dtype=dtype, time_major=True,
-                                             scope=scope.name,
-                                             swap_memory=False)
-        else:
-          outputs, _ = tf.nn.bidirectional_dynamic_rnn(multi_cell, multi_cell, rnn_input,
-                                                       sequence_length=rnn_seq_lens, dtype=dtype,
-                                                       time_major=True, scope=scope.name,
-                                                       swap_memory=False)
-          outputs_fw, outputs_bw = outputs
-          rnn_outputs = outputs_fw + outputs_bw
+        rnn_outputs = custom_ops.stacked_brnn(multi_cell, multi_cell, params.num_hidden, params.num_rnn_layers, rnn_input, rnn_seq_lens, params.batch_size)
         _activation_summary(rnn_outputs)
 
     # print "rnn output:", rnn_outputs.get_shape()
@@ -226,7 +214,6 @@ def inference(sess, feats, seq_lens, params):
         _activation_summary(logits)
 
     return logits
-
 
 def loss(logits, labels, seq_lens):
     """Compute mean CTC Loss.
