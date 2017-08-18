@@ -281,31 +281,24 @@ def get_loss_grads(sess, data, optimizer):
 
     # Calculate the gradients for each model tower.
     [feats, labels, seq_lens] = data
-    tower_grads = []
+    grads_and_vars = None
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
-        for i in range(1):
-            with tf.device('/cpu:%d' % i):
-                name_scope = '%s_%d' % (helper_routines.TOWER_NAME, i)
-                with tf.name_scope(name_scope) as scope:
-                    # Calculate the loss for one tower of the deepSpeech model.
-                    # This function constructs the entire deepSpeech model
-                    # but shares the variables across all towers.
-                    loss = tower_loss(sess, scope, feats[i], labels[i], seq_lens[i])
+        with tf.device('/cpu'):
+            with tf.name_scope("loss_grad") as scope:
+                # Calculate the loss for the deepSpeech model.
+                loss = tower_loss(sess, scope, feats, labels, seq_lens)
 
-                    # Reuse variables for the next tower.
-                    tf.get_variable_scope().reuse_variables()
+                # Reuse variables for the next tower.
+                tf.get_variable_scope().reuse_variables()
 
-                    # Retain the summaries from the final tower.
-                    summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
+                # Retain the summaries from the final tower.
+                summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
 
-                    # Calculate the gradients for the batch of
-                    # data on this tower.
-                    grads_and_vars = optimizer.compute_gradients(loss)
+                # Calculate the gradients for the batch of
+                # data on this tower.
+                grads_and_vars = optimizer.compute_gradients(loss)
 
-                    # Keep track of the gradients across all towers.
-                    tower_grads.append(grads_and_vars)
-
-    return loss, tower_grads, summaries
+    return loss, grads_and_vars, summaries
 
 
 def run_train_loop(sess, operations, saver):
@@ -327,14 +320,14 @@ def run_train_loop(sess, operations, saver):
         if DUMMY:
             feats, idx, vals, shape, seq_lens = deepSpeech_dummy.inputs(ARGS.batch_size)
             data_gen_time = time.time()
-            # labels_val = labels.eval(session = sess)
+
             dummy_input_duration = data_gen_time - start_time
             _, loss_value = sess.run([train_op, loss_op], options=run_options, run_metadata=run_metadata,
                                      feed_dict={feats_batch: feats,
-                                                  idx_batch: idx, 
-                                                  vals_batch: vals,
-                                                  shape_batch: shape,
-                                                  seq_lens_batch: seq_lens
+                                                idx_batch: idx, 
+                                                vals_batch: vals,
+                                                shape_batch: shape,
+                                                seq_lens_batch: seq_lens
                                                 })
         else:
             _, loss_value = sess.run([train_op, loss_op], options=run_options, run_metadata=run_metadata)
@@ -419,6 +412,7 @@ def initialize_from_checkpoint(sess, saver):
 
 def add_summaries(summaries, learning_rate, grads):
     """ Add summary ops"""
+
     # Track quantities for Tensorboard display
     summaries.append(tf.summary.scalar('learning_rate', learning_rate))
     # Add histograms for gradients.
@@ -435,10 +429,10 @@ def add_summaries(summaries, learning_rate, grads):
 
 
 def train():
-    """Train deepSpeech for a number of steps.
-    This function build a set of ops required to build the model and optimize
-    weights.
-
+    """
+    Train deepSpeech for a number of steps.
+      This function build a set of ops required to build the model and optimize
+      weights.
     """
     with g.as_default(), tf.device('/cpu'):
         # Learning rate set up
@@ -452,11 +446,8 @@ def train():
             data = fetch_data()
         else: 
             # idx, vals, s_shape = deepSpeech_dummy.dense_to_sparse(labels_batch, labels_batch_w, labels_batch_h)
-            labels_batch = tf.SparseTensor(indices=idx_batch, values=vals_batch, dense_shape=shape_batch)
-            split_feats = tf.split(feats_batch, 1, 0)
-            split_labels = tf.sparse_split(sp_input=tf.cast(labels_batch, tf.int32), num_split=1, axis=0)
-            split_seq_lens = tf.split(seq_lens_batch, 1, 0)
-            data = [split_feats, split_labels, split_seq_lens]
+            labels_batch = tf.SparseTensor(indices=idx_batch, values=tf.cast(vals_batch, tf.int32), dense_shape=shape_batch)
+            data = [feats_batch, labels_batch, seq_lens_batch]
 
         # Start running operations on the Graph. allow_soft_placement
         # must be set to True to build towers on GPU, as some of the
@@ -468,11 +459,11 @@ def train():
             intra_op_parallelism_threads=ARGS.intra_op))
 
         # Construct loss and gradient ops
-        loss_op, tower_grads, summaries = get_loss_grads(sess, data, optimizer)
+        loss_op, grads, summaries = get_loss_grads(sess, data, optimizer)
 
         # We must calculate the mean of each gradient. Note that this is the
         # synchronization point across all towers.
-        grads = average_gradients(tower_grads)
+        # grads = average_gradients(tower_grads)
         # grads = tower_grads[0]
 
         # Apply the gradients to adjust the shared variables.

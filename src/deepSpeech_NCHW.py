@@ -213,6 +213,7 @@ def inference(sess, feats, seq_lens, params):
 
     return logits
 
+
 def loss(logits, labels, seq_lens):
     """Compute mean CTC Loss.
 
