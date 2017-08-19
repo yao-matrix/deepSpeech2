@@ -29,6 +29,6 @@ def setenvs(inargv):
         os.environ["OMP_NUM_THREADS"] = "8"
         os.environ["MKL_NUM_THREADS"] = "8"
         os.environ["OMP_DYNAMIC"] = "false"
-        os.environ["KMP_AFFINITY"] = "granularity=fine,verbose,compact,1,0"
+        os.environ["KMP_AFFINITY"] = "granularity=fine,verbose,explicit,1,0,proclist=[4-67]"
         # os.environ["KMP_AFFINITY"] = "granularity=core,verbose,scatter"
     return args
