@@ -39,12 +39,12 @@ def parse_args():
                         help='Directory where to read model checkpoints.')
     parser.add_argument('--eval_data', type=str, default='val',
                         help="Either 'test' or 'val' or 'train' ")
-    parser.add_argument('--batch_size', type=int, default=32,
+    parser.add_argument('--batch_size', type=int, default=1,
                         help='Number of feats to process in a batch')
     parser.add_argument('--eval_interval_secs', type=int, default=60 * 5,
                         help='How often to run the eval')
     parser.add_argument('--data_dir', type=str,
-                        default='../data/librispeech/processed/',
+                        default='../data/LibriSpeech/processed/',
                         help='Path to the deepSpeech data directory')
     parser.add_argument('--run_once', type=bool, default=False,
                         help='Whether to run eval only once')
@@ -66,7 +66,6 @@ def parse_args():
         args.rnn_type = params['rnn_type']
         args.num_filters = params['num_filters']
         args.use_fp16 = params['use_fp16']
-        args.temporal_stride = params['temporal_stride']
         args.moving_avg_decay = params['moving_avg_decay']
     return args
 
@@ -77,10 +76,11 @@ if ARGS.nchw is True:
 else:
   import deepSpeech
 
+
 def sparse_to_labels(sparse_matrix):
     """ Convert index based transcripts to strings"""
 
-    results = [''] * sparse_matrix.shape[0]
+    results = [''] * sparse_matrix.dense_shape[0]
     for i, val in enumerate(sparse_matrix.values.tolist()):
         results[sparse_matrix.indices[i, 0]] += IX_TO_CHAR[val]
     return results
@@ -123,7 +123,7 @@ def inference(predictions_op, true_labels_op, display, sess):
     pred_label = sparse_to_labels(predictions[0][0])
     actual_label = sparse_to_labels(true_labels)
     for (label, pred) in zip(actual_label, pred_label):
-        char_err_rate.append(distance(label, pred)/len(label))
+        char_err_rate.append(distance(label, pred) / len(label))
 
     if display:
         # Print sample responses
@@ -165,8 +165,9 @@ def eval_once(sess, saver, summary_writer, predictions_op, summary_op,
         step = 0
         char_err_rate = []
         while step < num_iter and not coord.should_stop():
+            print "step: ", step
             char_err_rate.append(inference(predictions_op, true_labels_op,
-                                           step == 0, sess))
+                                           True, sess))
             step += 1
 
         # Compute and print mean CER
@@ -207,7 +208,7 @@ def evaluate():
         # Calculate predictions.
         output_log_prob = tf.nn.log_softmax(logits)
         decoder = tf.nn.ctc_greedy_decoder
-        strided_seq_lens = tf.div(seq_lens, ARGS.temporal_stride)
+        strided_seq_lens = deepSpeech.get_rnn_seqlen(seq_lens)
         predictions = decoder(output_log_prob, strided_seq_lens)
 
         # Restore the moving average version of the learned variables for eval.
@@ -216,8 +217,8 @@ def evaluate():
         saver = tf.train.Saver(variables_to_restore)
 
         # Build the summary operation based on the TF collection of Summaries.
-        summary_op = tf.merge_all_summaries()
-        summary_writer = tf.train.SummaryWriter(ARGS.eval_dir, graph)
+        summary_op = tf.summary.merge_all()
+        summary_writer = tf.summary.FileWriter(ARGS.eval_dir, graph)
 
         while True:
             eval_once(session, saver, summary_writer, predictions, summary_op, labels)

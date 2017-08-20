@@ -505,11 +505,13 @@ def train():
         run_train_loop(sess, (train_op, loss_op, summary_op), saver)
 
 
-def main():
+def run():
     """
     Creates checkpoint directory to save training progress and records
     training parameters in a json file before initiating the training session.
     """
+    print "run xxxxxxxxxx"
+
     if ARGS.train_dir != ARGS.checkpoint:
         if tf.gfile.Exists(ARGS.train_dir):
             tf.gfile.DeleteRecursively(ARGS.train_dir)
@@ -537,4 +539,4 @@ def main():
     train()
 
 if __name__ == '__main__':
-    main()
+    run()

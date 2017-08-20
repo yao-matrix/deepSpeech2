@@ -25,9 +25,9 @@ nchw=true
 engine="mkl" # tf, mkl, cudnn_rnn, mkldnn_rnn
 
 if [[ !${nchw} && (${engine} == "tf" || ${engine} == "cudnn_rnn") ]];then
-	python deepSpeech_test.py --eval_data 'test' --nchw ${nchw} --engine ${engine} --run_once true
+	python deepSpeech_test.py --eval_data 'val' --nchw ${nchw} --engine ${engine}
 elif [[ ${nchw} && (${engine} == "mkl" || ${engine} == "mkldnn_rnn") ]];then
-	python deepSpeech_test.py --eval_data 'test' --nchw ${nchw} --engine ${engine} --run_once true 
+	python deepSpeech_test.py --eval_data 'val' --nchw ${nchw} --engine ${engine}
 else
 	echo "unsupported parameter combination"
 fi
