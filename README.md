@@ -1,13 +1,13 @@
 # TensorFlow implementation of deepSpeech
 End-to-end speech recognition using distributed TensorFlow
 
-This repository contains TensorFlow code for an end-to-end speech recognition engine using Deep Neural Networks inspired by Baidu's DeepSpeech model, that can train on multiple GPUs. This work was developed at Ford Research and Innovation Center Palo Alto.
+This repository contains TensorFlow code for an end-to-end speech recognition engine using Deep Neural Networks inspired by Baidu's DeepSpeech model, that can train on multiple GPUs. This work was based on the code developed by Ford[https://github.com/fordDeepDSP/deepSpeech] and did many changes.
 
 This software is released under a BSD license. The license to this software does not apply to TensorFlow, which is available under the Apache 2.0 license, or the third party pre-requisites listed below, which are available under their own respective licenses.
 
 Pre-requisites
 -------------
-* TensorFlow - version: 1.1.0
+* TensorFlow - version: 1.1.0, 1.2.0
 * Python     - version: 2.7
 * python-levenshtein - to compute Character-Error-Rate
 * python_speech_features - to generate mfcc features
@@ -27,15 +27,15 @@ $ pip install PySoundFile
 $ pip install scipy
 $ pip install tqdm
 
-# Install TensorFlow 1.1.0:
-$ pip install 'tensorflow==1.1.0'
+# Install TensorFlow 1.2.0:
+$ pip install 'tensorflow==1.2.0'
 
 # [GPU ONLY] Update ~/.bashrc to reflect path for CUDA.
 1. Add these lines to the ~/.bashrc:
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64"
 export CUDA_HOME=/usr/local/cuda
 2.
-$ pip install --upgrade 'tensorflow-gpu==1.1.0'
+$ pip install --upgrade 'tensorflow-gpu==1.2.0'
 
 ```
 *Step 2: Clone this git repo.*
