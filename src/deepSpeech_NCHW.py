@@ -69,10 +69,10 @@ def inputs(eval_data, data_dir, batch_size, use_fp16, shuffle):
     if not data_dir:
         raise ValueError('Please supply a data_dir')
     print 'Using Libri Data'
-    feats, labels, seq_lens = deepSpeech_input.inputs(eval_data = eval_data,
-                                                      data_dir = data_dir,
-                                                      batch_size = batch_size,
-                                                      shuffle = shuffle)
+    feats, labels, seq_lens = deepSpeech_input.inputs(eval_data=eval_data,
+                                                      data_dir=data_dir,
+                                                      batch_size=batch_size,
+                                                      shuffle=shuffle)
     if use_fp16:
         feats = tf.cast(feats, tf.float16)
     return feats, labels, seq_lens
@@ -100,7 +100,7 @@ def inference(sess, feats, seq_lens, params):
     else:
         dtype = tf.float32
 
-    feat_len = feats.get_shape().as_list()[-1]
+    # feat_len = feats.get_shape().as_list()[-1]
     # data layout: N, T, F
     # print "feat shape: ", feats.get_shape().as_list()
 
@@ -112,10 +112,10 @@ def inference(sess, feats, seq_lens, params):
         kernel = _variable_with_weight_decay(
             'weights',
             shape = [20, 5, 1, params.num_filters],
-            wd_value = None, use_fp16 = params.use_fp16)
+            wd_value=None, use_fp16=params.use_fp16)
 
         ## N, T, F
-        feats = tf.expand_dims(feats, axis = 1)
+        feats = tf.expand_dims(feats, axis=1)
         ## N, 1, T, F
         conv = tf.nn.conv2d(feats, kernel,
                             strides = [1, 1, 2, 2],
@@ -124,13 +124,13 @@ def inference(sess, feats, seq_lens, params):
         biases = _variable_on_cpu('biases', [params.num_filters],
                                   tf.constant_initializer(-0.05),
                                   params.use_fp16)
-        bias = tf.nn.bias_add(conv, biases, data_format = 'NCHW')
+        bias = tf.nn.bias_add(conv, biases, data_format='NCHW')
         ## N, 32, T, F
         # batch normalization
-        bn = custom_ops.batch_norm2(bias, data_format = 'NCHW')
+        bn = custom_ops.batch_norm2(bias, data_format='NCHW')
 
         # clipped ReLU
-        conv1 = custom_ops.relux(bn, capping = 20)
+        conv1 = custom_ops.relux(bn, capping=20)
         _activation_summary(conv1)
 
     with tf.variable_scope('conv2') as scope:
@@ -143,18 +143,18 @@ def inference(sess, feats, seq_lens, params):
         ## N, 32, T, F
         conv = tf.nn.conv2d(conv1, kernel,
                             [1, 1, 2, 1],
-                            padding = 'VALID',
-                            data_format = 'NCHW')
+                            padding='VALID',
+                            data_format='NCHW')
         biases = _variable_on_cpu('biases', [params.num_filters],
                                   tf.constant_initializer(-0.05),
                                   params.use_fp16)
-        bias = tf.nn.bias_add(conv, biases, data_format = 'NCHW')
+        bias = tf.nn.bias_add(conv, biases, data_format='NCHW')
         ## N, 32, T, F
         # batch normalization
-        bn = custom_ops.batch_norm2(bias, data_format = 'NCHW')
+        bn = custom_ops.batch_norm2(bias, data_format='NCHW')
 
         # clipped ReLU
-        conv2 = custom_ops.relux(bn, capping = 20)
+        conv2 = custom_ops.relux(bn, capping=20)
         _activation_summary(conv2)
 
     ######################

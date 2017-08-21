@@ -103,7 +103,6 @@ def parse_args():
  
     args = parser.parse_args()
 
-
     # Read architecture hyper-parameters from checkpoint file
     # if one is provided.
     if args.checkpoint is not None:
@@ -124,13 +123,13 @@ def parse_args():
 
 ARGS = parse_args()
 
-if ARGS.nchw is True:
+if ARGS.nchw == 1:
   import deepSpeech_NCHW as deepSpeech
 else:
   import deepSpeech
 
 g = tf.Graph()
-if ARGS.dummy:
+if ARGS.dummy == 1:
     with g.as_default():
         feats_batch = tf.placeholder(dtype=tf.float32, shape=[None, None, deepSpeech_dummy.freq_bins])
         idx_batch = tf.placeholder(dtype=tf.int64)
@@ -238,13 +237,11 @@ def set_learning_rate():
 
     # Create a variable to count the number of train() calls.
     # This equals the number of batches processed.
-    global_step = tf.get_variable(
-        'global_step', [],
-        initializer=tf.constant_initializer(0), trainable=False)
+    global_step = tf.get_variable('global_step', [],
+                                  initializer=tf.constant_initializer(0), trainable=False)
 
     # Calculate the learning rate schedule.
-    num_batches_per_epoch = (deepSpeech.NUM_PER_EPOCH_FOR_TRAIN /
-                             ARGS.batch_size)
+    num_batches_per_epoch = (deepSpeech.NUM_PER_EPOCH_FOR_TRAIN / ARGS.batch_size)
     decay_steps = int(num_batches_per_epoch * ARGS.num_epochs_per_decay)
 
     # Decay the learning rate exponentially based on the number of steps.
@@ -268,11 +265,7 @@ def fetch_data():
                                                 shuffle = ARGS.shuffle)
 
     # Split features and labels and sequence lengths for each tower
-    split_feats = tf.split(feats, 1, 0)
-    split_labels = tf.sparse_split(sp_input=labels, num_split=1, axis = 0)
-    split_seq_lens = tf.split(seq_lens, 1, 0)
-
-    return split_feats, split_labels, split_seq_lens
+    return feats, labels, seq_lens
 
 
 def get_loss_grads(sess, data, optimizer):
@@ -308,7 +301,7 @@ def run_train_loop(sess, operations, saver):
     run_options = None
     run_metadata = None
     trace_file = None
-    if ARGS.debug:
+    if ARGS.debug == 1:
         run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         run_metadata = tf.RunMetadata()
         trace_file = open('profiling.json', 'w')
@@ -317,7 +310,7 @@ def run_train_loop(sess, operations, saver):
     for step in range(ARGS.max_steps):
         start_time = time.time()
         
-        if ARGS.dummy:
+        if ARGS.dummy == 1:
             feats, idx, vals, shape, seq_lens = deepSpeech_dummy.inputs(ARGS.batch_size)
             data_gen_time = time.time()
 
@@ -342,7 +335,7 @@ def run_train_loop(sess, operations, saver):
         # Print progress periodically
         if step > 10 and step % 10 == 0:
             examples_per_sec = (ARGS.batch_size * 1) / np.average(profiling)
-            if ARGS.dummy:
+            if ARGS.dummy == 1:
                 format_str = ('%s: step %d, '
                               'loss = %.2f (%.1f examples/sec; %.3f '
                               'sec/batch; '
@@ -352,13 +345,13 @@ def run_train_loop(sess, operations, saver):
                                     dummy_input_duration))
             else:
                 format_str = ('%s: step %d, '
-                          'loss = %.2f (%.1f examples/sec; %.3f '
-                          'sec/batch)')
+                              'loss = %.2f (%.1f examples/sec; %.3f '
+                              'sec/batch)')
                 print(format_str % (datetime.now(), step, loss_value,
                                     examples_per_sec, np.average(profiling) / 1))
 
         # Run the summary ops periodically
-        if step % 50 == 0 and not ARGS.debug:
+        if step % 50 == 0 and ARGS.dummy == 0:
             summary_writer = tf.summary.FileWriter(ARGS.train_dir, sess.graph)
             summary_writer.add_summary(sess.run(summary_op), step)
 
@@ -367,7 +360,7 @@ def run_train_loop(sess, operations, saver):
             checkpoint_path = os.path.join(ARGS.train_dir, 'model.ckpt')
             saver.save(sess, checkpoint_path, global_step=step)
 
-        if ARGS.debug and step == 20:
+        if ARGS.debug == 1 and step == 20:
             trace = timeline.Timeline(run_metadata.step_stats)
             trace_file.write(trace.generate_chrome_trace_format())
 
@@ -442,7 +435,7 @@ def train():
         optimizer = tf.train.AdamOptimizer(learning_rate)
 
         # Fetch a batch worth of data for each tower
-        if not ARGS.dummy: 
+        if ARGS.dummy == 0: 
             data = fetch_data()
         else: 
             # idx, vals, s_shape = deepSpeech_dummy.dense_to_sparse(labels_batch, labels_batch_w, labels_batch_h)
@@ -452,11 +445,10 @@ def train():
         # Start running operations on the Graph. allow_soft_placement
         # must be set to True to build towers on GPU, as some of the
         # ops do not have GPU implementations.
-        sess = tf.Session(config = tf.ConfigProto(
-            allow_soft_placement=True,
-            log_device_placement=ARGS.log_device_placement,
-            inter_op_parallelism_threads=ARGS.inter_op,
-            intra_op_parallelism_threads=ARGS.intra_op))
+        sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True,
+                                                log_device_placement=ARGS.log_device_placement,
+                                                inter_op_parallelism_threads=ARGS.inter_op,
+                                                intra_op_parallelism_threads=ARGS.intra_op))
 
         # Construct loss and gradient ops
         loss_op, grads, summaries = get_loss_grads(sess, data, optimizer)
@@ -468,13 +460,11 @@ def train():
 
         # Apply the gradients to adjust the shared variables.
         apply_gradient_op = optimizer.apply_gradients(grads,
-                                                      global_step = global_step)
+                                                      global_step=global_step)
 
         # Track the moving averages of all trainable variables.
-        variable_averages = tf.train.ExponentialMovingAverage(
-            ARGS.moving_avg_decay, global_step)
-        variables_averages_op = variable_averages.apply(
-            tf.trainable_variables())
+        variable_averages = tf.train.ExponentialMovingAverage(ARGS.moving_avg_decay, global_step)
+        variables_averages_op = variable_averages.apply(tf.trainable_variables())
 
         # Group all updates to into a single train op.
         train_op = tf.group(apply_gradient_op, variables_averages_op)
@@ -483,7 +473,7 @@ def train():
         summary_op = add_summaries(summaries, learning_rate, grads)
 
         # Create a saver.
-        saver = tf.train.Saver(tf.global_variables(), max_to_keep = 100)
+        saver = tf.train.Saver(tf.global_variables(), max_to_keep=100)
 
         # sess = tf_debug.LocalCLIDebugWrapperSession(sess)
         # sess.add_tensor_filter("has_inf_or_nan", tf_debug.has_inf_or_nan)
@@ -496,7 +486,7 @@ def train():
             print "does not have checkpoint"
             sess.run(tf.global_variables_initializer())
 
-        if not ARGS.dummy:
+        if ARGS.dummy == 0:
             # Start the queue runners.
             tf.train.start_queue_runners(sess)
 
@@ -506,7 +496,7 @@ def train():
         run_train_loop(sess, (train_op, loss_op, summary_op), saver)
 
 
-def run():
+def main():
     """
     Creates checkpoint directory to save training progress and records
     training parameters in a json file before initiating the training session.
@@ -538,4 +528,4 @@ def run():
     train()
 
 if __name__ == '__main__':
-    run()
+    main()
