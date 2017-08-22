@@ -60,8 +60,3 @@ echo "Done"
 # deactivate Intel Python
 # source /opt/intel/intelpython2/bin/deactivate
 
-# clear
-# echo "-----------------------------------"
-# echo "Training now on dummy data"
-# filename='../models/dummy/train'
-# python deepSpeech_train.py --batch_size 32 --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --num_filters 32 --checkpoint ../models/dummy --train_dir $filename

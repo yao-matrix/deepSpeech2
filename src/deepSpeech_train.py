@@ -36,70 +36,70 @@ from setenvs import arglist
 def parse_args():
     " Parses command line arguments."
     parser = argparse.ArgumentParser()
-    parser.add_argument('--train_dir', type = str,
-                        default = '../models/librispeech/train',
-                        help = 'Directory to write event logs and checkpoints')
-    parser.add_argument('--platform', type = str,
-                        default = 'knl',
-                        help = 'running platform: knl or bdw')
-    parser.add_argument('--data_dir', type = str,
-                        default = '',
-                        help = 'Path to the audio data directory')
-    parser.add_argument('--max_steps', type = int, default = 20000,
-                        help = 'Number of batches to run')
-    parser.add_argument('--log_device_placement', type = bool, default = False,
-                        help = 'Whether to log device placement')
-    parser.add_argument('--batch_size', type = int, default = 32,
-                        help = 'Number of inputs to process in a batch per GPU')
-    parser.add_argument('--temporal_stride', type = int, default = 1,
-                        help = 'Stride along time')
+    parser.add_argument('--train_dir', type=str,
+                        default='../models/librispeech/train',
+                        help='Directory to write event logs and checkpoints')
+    parser.add_argument('--platform', type=str,
+                        default='knl',
+                        help='running platform: knl or bdw')
+    parser.add_argument('--data_dir', type=str,
+                        default='',
+                        help='Path to the audio data directory')
+    parser.add_argument('--max_steps', type=int, default=20000,
+                        help='Number of batches to run')
+    parser.add_argument('--log_device_placement', type=bool, default=False,
+                        help='Whether to log device placement')
+    parser.add_argument('--batch_size', type=int, default=32,
+                        help='Number of inputs to process in a batch per GPU')
+    parser.add_argument('--temporal_stride', type=int, default=1,
+                        help='Stride along time')
 
-    feature_parser = parser.add_mutually_exclusive_group(required = False)
-    feature_parser.add_argument('--shuffle', dest = 'shuffle',
-                                action = 'store_true')
-    feature_parser.add_argument('--no-shuffle', dest = 'shuffle',
-                                action = 'store_false')
-    parser.set_defaults(shuffle = True)
+    feature_parser = parser.add_mutually_exclusive_group(required=False)
+    feature_parser.add_argument('--shuffle', dest='shuffle',
+                                action='store_true')
+    feature_parser.add_argument('--no-shuffle', dest='shuffle',
+                                action='store_false')
+    parser.set_defaults(shuffle=True)
 
-    feature_parser = parser.add_mutually_exclusive_group(required = False)
-    feature_parser.add_argument('--use_fp16', dest = 'use_fp16',
-                                action = 'store_true')
-    feature_parser.add_argument('--use_fp32', dest = 'use_fp16',
-                                action = 'store_false')
-    parser.set_defaults(use_fp16 = False)
+    feature_parser = parser.add_mutually_exclusive_group(required=False)
+    feature_parser.add_argument('--use_fp16', dest='use_fp16',
+                                action='store_true')
+    feature_parser.add_argument('--use_fp32', dest='use_fp16',
+                                action='store_false')
+    parser.set_defaults(use_fp16=False)
 
-    parser.add_argument('--keep_prob', type = float, default = 0.5,
-                        help = 'Keep probability for dropout')
-    parser.add_argument('--num_hidden', type = int, default = 1024,
-                        help = 'Number of hidden nodes')
-    parser.add_argument('--num_rnn_layers', type = int, default = 2,
-                        help = 'Number of recurrent layers')
-    parser.add_argument('--checkpoint', type = str, default = None,
-                        help = 'Continue training from checkpoint file')
-    parser.add_argument('--rnn_type', type = str, default = 'bidirectional',
-                        help = 'unidirectional or bidirectional')
-    parser.add_argument('--initial_lr', type = float, default = 0.00001,
-                        help = 'Initial learning rate for training')
-    parser.add_argument('--num_filters', type = int, default = 32,
-                        help = 'Number of convolutional filters')
-    parser.add_argument('--moving_avg_decay', type = float, default = 0.9999,
-                        help = 'Decay to use for the moving average of weights')
-    parser.add_argument('--num_epochs_per_decay', type = int, default = 5,
-                        help = 'Epochs after which learning rate decays')
-    parser.add_argument('--lr_decay_factor', type = float, default = 0.9,
-                        help = 'Learning rate decay factor')
-    parser.add_argument('--intra_op', type = int, default = 44,
-                        help = 'Intra op thread num')
-    parser.add_argument('--inter_op', type = int, default = 1,
-                        help = 'Inter op thread num')
-    parser.add_argument('--engine', type = str, default = 'tf',
-                        help = 'Select the engine you use: tf, mkl, mkldnn_rnn, cudnn_rnn')
-    parser.add_argument('--debug', type = bool, default = False,
-                        help = 'Switch on to enable debug log')
-    parser.add_argument('--nchw', type = bool, default = True,
-                        help = 'Whether to use nchw memory layout')
-    parser.add_argument('--dummy', type = bool, default = True,
-                        help = 'Whether to use dummy data rather than librispeech data')
+    parser.add_argument('--keep_prob', type=float, default=0.5,
+                        help='Keep probability for dropout')
+    parser.add_argument('--num_hidden', type=int, default=1024,
+                        help='Number of hidden nodes')
+    parser.add_argument('--num_rnn_layers', type=int, default=2,
+                        help='Number of recurrent layers')
+    parser.add_argument('--checkpoint', type=str, default=None,
+                        help='Continue training from checkpoint file')
+    parser.add_argument('--rnn_type', type=str, default='bidirectional',
+                        help='unidirectional or bidirectional')
+    parser.add_argument('--initial_lr', type=float, default=0.00001,
+                        help='Initial learning rate for training')
+    parser.add_argument('--num_filters', type=int, default=32,
+                        help='Number of convolutional filters')
+    parser.add_argument('--moving_avg_decay', type=float, default=0.9999,
+                        help='Decay to use for the moving average of weights')
+    parser.add_argument('--num_epochs_per_decay', type=int, default=5,
+                        help='Epochs after which learning rate decays')
+    parser.add_argument('--lr_decay_factor', type=float, default=0.9,
+                        help='Learning rate decay factor')
+    parser.add_argument('--intra_op', type=int, default=44,
+                        help='Intra op thread num')
+    parser.add_argument('--inter_op', type=int, default=1,
+                        help='Inter op thread num')
+    parser.add_argument('--engine', type=str, default='tf',
+                        help='Select the engine you use: tf, mkl, mkldnn_rnn, cudnn_rnn')
+    parser.add_argument('--debug', type=bool, default=False,
+                        help='Switch on to enable debug log')
+    parser.add_argument('--nchw', type=bool, default=True,
+                        help='Whether to use nchw memory layout')
+    parser.add_argument('--dummy', type=bool, default=True,
+                        help='Whether to use dummy data rather than librispeech data')
  
     args = parser.parse_args()
 

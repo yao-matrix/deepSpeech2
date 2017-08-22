@@ -1,34 +1,26 @@
 # Author: Lakshmi Krishnan
 # Email: lkrishn7@ford.com
+# Author: YAO Matrix
+# Email: yaoweifeng0301@126.com
 
-"""Evaluation for deepSpeech.
-
-Accuracy:
-deepSpeech_train.py achieves 15% char_err_rate after 30K steps as
-judged by deepSpeech_test.py.
-
-Speed:
-On a machine with 3 TitanX(Pascal) GPUs, deepSpeech_train.py processes
-a single batch of 32 utterancesin 0.25-1.25 sec based on utterance lengths.
-The model reaches ~15% char_err_rate on the test set after 30K
-steps in 32 hours of training time.
+"""Evaluation for DeepSpeech2.
 
 Usage:
 Please see the tutorial and website for how to download the Librispeech
 data set, generate the TFRecord files of features and train the model.
 
-
 """
+
 import json
 import os
 import math
 import time
 import argparse
 from datetime import datetime
-import deepSpeech
 import numpy as np
-import tensorflow as tf
 from Levenshtein import distance
+
+import tensorflow as tf
 
 # Note this definition must match the ALPHABET chosen in
 # preprocess_Librispeech.py
@@ -56,6 +48,10 @@ def parse_args():
                         help='Path to the deepSpeech data directory')
     parser.add_argument('--run_once', type=bool, default=False,
                         help='Whether to run eval only once')
+    parser.add_argument('--engine', type=str, default='tf',
+                        help = 'Select the engine you use: tf, mkl, mkldnn_rnn, cudnn_rnn')
+    parser.add_argument('--nchw', type=bool, default=True,
+                        help = 'Whether to use nchw memory layout')
     args = parser.parse_args()
 
     # Read saved parameters from file
@@ -74,10 +70,17 @@ def parse_args():
         args.moving_avg_decay = params['moving_avg_decay']
     return args
 
+ARGS = parse_args()
+
+if ARGS.nchw is True:
+  import deepSpeech_NCHW as deepSpeech
+else:
+  import deepSpeech
 
 def sparse_to_labels(sparse_matrix):
     """ Convert index based transcripts to strings"""
-    results = ['']*sparse_matrix.shape[0]
+
+    results = [''] * sparse_matrix.shape[0]
     for i, val in enumerate(sparse_matrix.values.tolist()):
         results[sparse_matrix.indices[i, 0]] += IX_TO_CHAR[val]
     return results
@@ -129,7 +132,7 @@ def inference(predictions_op, true_labels_op, display, sess):
     return char_err_rate
 
 
-def eval_once(saver, summary_writer, predictions_op, summary_op,
+def eval_once(sess, saver, summary_writer, predictions_op, summary_op,
               true_labels_op):
     """Run Eval once.
 
@@ -139,51 +142,48 @@ def eval_once(saver, summary_writer, predictions_op, summary_op,
       predictions_ops: Op to compute predictions.
       summary_op: Summary op.
     """
-    with tf.Session() as sess:
 
-        # Initialize weights from checkpoint file.
-        global_step = initialize_from_checkpoint(sess, saver)
+    # Initialize weights from checkpoint file.
+    global_step = initialize_from_checkpoint(sess, saver)
 
-        # Start the queue runners.
-        coord = tf.train.Coordinator()
-        try:
-            threads = []
-            for queue_runners in tf.get_collection(tf.GraphKeys.QUEUE_RUNNERS):
-                threads.extend(queue_runners.create_threads(sess, coord=coord,
-                                                            daemon=True,
-                                                            start=True))
-            # Only using a subset of the training data
-            if ARGS.eval_data == 'train':
-                num_examples = 2048
+    # Start the queue runners.
+    coord = tf.train.Coordinator()
+    try:
+        threads = []
+        for queue_runners in tf.get_collection(tf.GraphKeys.QUEUE_RUNNERS):
+            threads.extend(queue_runners.create_threads(sess, coord=coord,
+                                                        daemon=True,
+                                                        start=True))
+        # Only using a subset of the training data
+        if ARGS.eval_data == 'train':
+            num_examples = 2048
+        elif ARGS.eval_data == 'val':
+            num_examples = 2703
+        elif ARGS.eval_data == 'test':
+            num_examples = 2620
+        num_iter = int(math.ceil(num_examples / ARGS.batch_size))
+        step = 0
+        char_err_rate = []
+        while step < num_iter and not coord.should_stop():
+            char_err_rate.append(inference(predictions_op, true_labels_op,
+                                           step == 0, sess))
+            step += 1
 
-            elif ARGS.eval_data == 'val':
-                num_examples = 2703
+        # Compute and print mean CER
+        avg_cer = np.mean(char_err_rate)*100
+        print('%s: char_err_rate = %.3f %%' % (datetime.now(), avg_cer))
 
-            elif ARGS.eval_data == 'test':
-                num_examples = 2620
-            num_iter = int(math.ceil(num_examples / ARGS.batch_size))
-            step = 0
-            char_err_rate = []
-            while step < num_iter and not coord.should_stop():
-                char_err_rate.append(inference(predictions_op, true_labels_op,
-                                               step == 0, sess))
-                step += 1
+        # Add summary ops
+        summary = tf.Summary()
+        summary.ParseFromString(sess.run(summary_op))
+        summary.value.add(tag='char_err_rate', simple_value=avg_cer)
+        summary_writer.add_summary(summary, global_step)
+    except Exception as exc:  # pylint: disable=broad-except
+        coord.request_stop(exc)
 
-            # Compute and print mean CER
-            avg_cer = np.mean(char_err_rate)*100
-            print('%s: char_err_rate = %.3f %%' % (datetime.now(), avg_cer))
-
-            # Add summary ops
-            summary = tf.Summary()
-            summary.ParseFromString(sess.run(summary_op))
-            summary.value.add(tag='char_err_rate', simple_value=avg_cer)
-            summary_writer.add_summary(summary, global_step)
-        except Exception as exc:  # pylint: disable=broad-except
-            coord.request_stop(exc)
-
-        # Close threads
-        coord.request_stop()
-        coord.join(threads, stop_grace_period_secs=10)
+    # Close threads
+    coord.request_stop()
+    coord.join(threads, stop_grace_period_secs=10)
 
 
 def evaluate():
@@ -197,11 +197,12 @@ def evaluate():
                                                     batch_size=ARGS.batch_size,
                                                     use_fp16=ARGS.use_fp16,
                                                     shuffle=True)
+        session = tf.Session()
 
         # Build ops that computes the logits predictions from the
         # inference model.
         ARGS.keep_prob = 1.0  # Disable dropout during testing.
-        logits = deepSpeech.inference(feats, seq_lens, ARGS)
+        logits = deepSpeech.inference(session, feats, seq_lens, ARGS)
 
         # Calculate predictions.
         output_log_prob = tf.nn.log_softmax(logits)
@@ -210,8 +211,7 @@ def evaluate():
         predictions = decoder(output_log_prob, strided_seq_lens)
 
         # Restore the moving average version of the learned variables for eval.
-        variable_averages = tf.train.ExponentialMovingAverage(
-            ARGS.moving_avg_decay)
+        variable_averages = tf.train.ExponentialMovingAverage(ARGS.moving_avg_decay)
         variables_to_restore = variable_averages.variables_to_restore()
         saver = tf.train.Saver(variables_to_restore)
 
@@ -220,7 +220,7 @@ def evaluate():
         summary_writer = tf.train.SummaryWriter(ARGS.eval_dir, graph)
 
         while True:
-            eval_once(saver, summary_writer, predictions, summary_op, labels)
+            eval_once(session, saver, summary_writer, predictions, summary_op, labels)
 
             if ARGS.run_once:
                 break
@@ -238,5 +238,4 @@ def main():
 
 
 if __name__ == '__main__':
-    ARGS = parse_args()
     main()

@@ -1,7 +1,7 @@
-# TensorFlow implementation of deepSpeech
-End-to-end speech recognition using distributed TensorFlow
+# TensorFlow implementation of DeepSpeech2
+End-to-end speech recognition using TensorFlow
 
-This repository contains TensorFlow code for an end-to-end speech recognition engine using Deep Neural Networks inspired by Baidu's DeepSpeech model, that can train on multiple GPUs. This work was based on the code developed by Ford[https://github.com/fordDeepDSP/deepSpeech] and did many changes.
+This repository contains TensorFlow code for an end-to-end speech recognition engine by implementing Baidu's DeepSpeech2 model on IA architectures. This work was based on the code developed by Ford[https://github.com/fordDeepDSP/deepSpeech] and many changes have been conducted to fin our solution.
 
 This software is released under a BSD license. The license to this software does not apply to TensorFlow, which is available under the Apache 2.0 license, or the third party pre-requisites listed below, which are available under their own respective licenses.
 
@@ -19,7 +19,7 @@ Getting started
 ------------------
 *Step 1: Install all dependencies.*
 
-```
+```shell
 $ yum install libsndfile
 $ pip install python-Levenshtein
 $ pip install python_speech_features
@@ -34,12 +34,12 @@ $ pip install 'tensorflow==1.2.0'
 1. Add these lines to the ~/.bashrc:
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64"
 export CUDA_HOME=/usr/local/cuda
-2.
+2. Install TF GPU package
 $ pip install --upgrade 'tensorflow-gpu==1.2.0'
 
 ```
 *Step 2: Clone this git repo.*
-```
+```shell
 (SpeechRecog)$ git clone https://github.com/yao-matrix/deepSpeech.git
 (SpeechRecog)$ cd deepSpeech
 ```
@@ -67,14 +67,14 @@ $ rm -rf LibriSpeech/train-clean-100/460/172359/460-172359-0090.flac
 *Step 2: Run this command to preprocess the audio and generate TFRecord files.*
 
 The computed mfcc features will be stored within TFRecords files inside data/librispeech/processed/
-```
+```shell
 $ cd ./src
 $ python preprocess_LibriSpeech.py
 ```
 
 Training a model w/ dummy data
 ----------------
-```
+```shell
 $ cd ./src
 $ vim ./train.sh
 # let dummy=true in train.sh
@@ -83,7 +83,7 @@ $ ./train.sh
 
 Training a model w/ real data
 ----------------
-```
+```shell
 # To continue training from a saved checkpoint file
 $ cd ./src
 $ vim ./train.sh
@@ -95,18 +95,18 @@ Note that during the first epoch, the cost will increase and it will take longer
 
 Monitoring training
 --------------------
-Since the training data is fed through a shuffled queue, to check validation loss a separate graph needs to be set up in a different session and potentially on an additional GPU. This graph is fed with the valildation data to compute predictions. The deepSpeech_test.py script initializes the graph from a previously saved checkpoint file and computes the CER on the eval_data every 5 minutes by default. It saves the computed CER values in the models/librispeech/eval folder. By calling tensorboard with logdir set to models/librispeech, it is possible to monitor validation CER and training loss during training.
-```
-$cd ./src
-$python deepSpeech_test.py --eval_data 'val' --checkpoint_dir PATH_TO_SAVED_CHECKPOINT_FILE
-$tensorboard --logdir PATH_TO_SUMMARY
+Since the training data is fed through a shuffled queue, to check validation loss a separate graph needs to be set up in a different session. This graph is fed with the valildation data to compute predictions. The deepSpeech_test.py script initializes the graph from a previously saved checkpoint file and computes the CER on the eval_data every 5 minutes by default. It saves the computed CER values in the models/librispeech/eval folder. By calling tensorboard with logdir set to models/librispeech, it is possible to monitor validation CER and training loss during training.
+```shell
+$ cd ./src
+$ python deepSpeech_test.py --eval_data 'val' --checkpoint_dir PATH_TO_SAVED_CHECKPOINT_FILE
+$ tensorboard --logdir PATH_TO_SUMMARY
 ```
 Testing a model
 ----------------
-```
-$cd ./src
-$python deepSpeech_test.py --eval_data 'test' --checkpoint_dir PATH_TO_SAVED_CHECKPOINT_FILE
+```shell
+$ cd ./src
+$ python deepSpeech_test.py --eval_data 'test' --checkpoint_dir PATH_TO_SAVED_CHECKPOINT_FILE
 ```
 
 # Thanks
-Thanks to Aswathy to help refine the README
+Thanks to Aswathy for helping refine the README
