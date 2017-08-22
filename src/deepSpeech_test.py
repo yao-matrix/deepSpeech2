@@ -46,11 +46,11 @@ def parse_args():
     parser.add_argument('--data_dir', type=str,
                         default='../data/LibriSpeech/processed/',
                         help='Path to the deepSpeech data directory')
-    parser.add_argument('--run_once', type=bool, default=False,
+    parser.add_argument('--run_once', type=int, default=0,
                         help='Whether to run eval only once')
     parser.add_argument('--engine', type=str, default='tf',
                         help = 'Select the engine you use: tf, mkl, mkldnn_rnn, cudnn_rnn')
-    parser.add_argument('--nchw', type=bool, default=True,
+    parser.add_argument('--nchw', type=int, default=1,
                         help = 'Whether to use nchw memory layout')
     args = parser.parse_args()
 

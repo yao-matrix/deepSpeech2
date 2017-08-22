@@ -77,7 +77,7 @@ Training a model w/ dummy data
 ```shell
 $ cd ./src
 $ vim ./train.sh
-# let dummy=true in train.sh
+# let dummy=1 in train.sh
 $ ./train.sh
 ```
 
@@ -87,7 +87,7 @@ Training a model w/ real data
 # To continue training from a saved checkpoint file
 $ cd ./src
 $ vim ./train.sh
-# let dummpy=false in train.sh
+# let dummy=0 in train.sh
 $ ./train.sh
 ```
 The script train.sh contains commands to train on utterances in sorted order for the first epoch and then to resume training on shuffled utterances.

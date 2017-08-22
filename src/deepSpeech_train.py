@@ -94,14 +94,15 @@ def parse_args():
                         help='Inter op thread num')
     parser.add_argument('--engine', type=str, default='tf',
                         help='Select the engine you use: tf, mkl, mkldnn_rnn, cudnn_rnn')
-    parser.add_argument('--debug', type=bool, default=False,
+    parser.add_argument('--debug', type=int, default=0,
                         help='Switch on to enable debug log')
-    parser.add_argument('--nchw', type=bool, default=True,
+    parser.add_argument('--nchw', type=int, default=1,
                         help='Whether to use nchw memory layout')
-    parser.add_argument('--dummy', type=bool, default=True,
+    parser.add_argument('--dummy', type=int, default=0,
                         help='Whether to use dummy data rather than librispeech data')
  
     args = parser.parse_args()
+
 
     # Read architecture hyper-parameters from checkpoint file
     # if one is provided.
@@ -510,8 +511,6 @@ def run():
     Creates checkpoint directory to save training progress and records
     training parameters in a json file before initiating the training session.
     """
-    print "run xxxxxxxxxx"
-
     if ARGS.train_dir != ARGS.checkpoint:
         if tf.gfile.Exists(ARGS.train_dir):
             tf.gfile.DeleteRecursively(ARGS.train_dir)

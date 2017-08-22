@@ -19,18 +19,26 @@ unset TF_CPP_MIN_VLOG_LEVEL
 
 # clear
 echo "-----------------------------------"
-echo "Start testing"
+echo "Start validation"
 
-nchw=true
+nchw=1       # 0, 1
 engine="mkl" # tf, mkl, cudnn_rnn, mkldnn_rnn
 
-if [[ !${nchw} && (${engine} == "tf" || ${engine} == "cudnn_rnn") ]];then
-	python deepSpeech_test.py --eval_data 'val' --nchw ${nchw} --engine ${engine}
-elif [[ ${nchw} && (${engine} == "mkl" || ${engine} == "mkldnn_rnn") ]];then
-	python deepSpeech_test.py --eval_data 'val' --nchw ${nchw} --engine ${engine}
-else
-	echo "unsupported parameter combination"
+
+config_check_one=`test ${nchw} -eq 0 && test "${engine}"x = "tf"x -o "${engine}"x = "cudnn_rnn"x && echo 'OK'`
+# echo "check one: "$config_check_one
+config_check_two=`test ${nchw} -eq 1 && test "${engine}"x == "mkl"x -o "${engine}"x = "mkldnn_rnn"x && echo 'OK'`
+# echo "check two: "$config_check_two
+check=`test ${config_check_one}x = "OK"x -o ${config_check_two}x = "OK"x && echo 'OK'`
+# echo "check: "$check
+
+if [[ ${check}x != "OK"x ]];then
+    echo "unsupported configuration conbimation"
+    exit -1
 fi
+
+python deepSpeech_test.py --eval_data 'val' --nchw ${nchw} --engine ${engine}
+
 echo "Done"
 
 # deactivate Intel Python
