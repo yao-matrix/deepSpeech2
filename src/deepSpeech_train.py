@@ -163,34 +163,24 @@ def tower_loss(sess, scope, feats, labels, seq_lens):
 
     # Build the portion of the Graph calculating the losses. Note that we will
     # assemble the total_loss using a custom function below.
-    _ = deepSpeech.loss(logits, labels, seq_lens)
-
-    # Assemble all of the losses for the current tower only.
-    losses = tf.get_collection('losses', scope)
-
-    # Calculate the total loss for the current tower.
-    total_loss = tf.add_n(losses, name = 'total_loss')
+    total_loss = deepSpeech.loss(logits, labels, seq_lens)
 
     # Compute the moving average of all individual losses and the total loss.
-    loss_averages = tf.train.ExponentialMovingAverage(0.9, name = 'avg')
-    loss_averages_op = loss_averages.apply(losses + [total_loss])
+    loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
+    loss_averages_op = loss_averages.apply([total_loss])
 
     # Attach a scalar summary to all individual losses and the total loss;
     # do the same for the averaged version of the losses.
-    for loss in losses + [total_loss]:
-        # Remove 'tower_[0-9]/' from the name in case this is a
-        # multi-GPU training session. This helps the clarity
-        # of presentation on tensorboard.
-        loss_name = re.sub('%s_[0-9]*/' % helper_routines.TOWER_NAME, '',
-                           loss.op.name)
-        # Name each loss as '(raw)' and name the moving average
-        # version of the loss as the original loss name.
-        tf.summary.scalar(loss_name + '(raw)', loss)
-        tf.summary.scalar(loss_name, loss_averages.average(loss))
+    loss_name = total_loss.op.name
+    # Name each loss as '(raw)' and name the moving average
+    # version of the loss as the original loss name.
+    tf.summary.scalar(loss_name + '(raw)', total_loss)
+    tf.summary.scalar(loss_name, loss_averages.average(total_loss))
 
     # Without this loss_averages_op would never run
     with tf.control_dependencies([loss_averages_op]):
         total_loss = tf.identity(total_loss)
+
     return total_loss
 
 
@@ -272,7 +262,7 @@ def get_loss_grads(sess, data, optimizer):
     """ Set up loss and gradient ops.
     Add summaries to trainable variables """
 
-    # Calculate the gradients for each model tower.
+    # Calculate the gradients
     [feats, labels, seq_lens] = data
     grads_and_vars = None
     with tf.variable_scope(tf.get_variable_scope()) as vscope:
@@ -356,7 +346,7 @@ def run_train_loop(sess, operations, saver):
             summary_writer.add_summary(sess.run(summary_op), step)
 
         # Save the model checkpoint periodically
-        if step % 1000 == 0 or (step + 1) == ARGS.max_steps:
+        if step % 10 == 0 or (step + 1) == ARGS.max_steps:
             checkpoint_path = os.path.join(ARGS.train_dir, 'model.ckpt')
             saver.save(sess, checkpoint_path, global_step=step)
 

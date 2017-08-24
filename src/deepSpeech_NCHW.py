@@ -118,9 +118,9 @@ def inference(sess, feats, seq_lens, params):
         feats = tf.expand_dims(feats, axis=1)
         ## N, 1, T, F
         conv = tf.nn.conv2d(feats, kernel,
-                            strides = [1, 1, 2, 2],
-                            padding = 'VALID',
-                            data_format = 'NCHW')
+                            strides=[1, 1, 2, 2],
+                            padding='VALID',
+                            data_format='NCHW')
         biases = _variable_on_cpu('biases', [params.num_filters],
                                   tf.constant_initializer(-0.05),
                                   params.use_fp16)
@@ -133,24 +133,24 @@ def inference(sess, feats, seq_lens, params):
         conv1 = custom_ops.relux(bn, capping=20)
         _activation_summary(conv1)
 
-    with tf.variable_scope('conv2') as scope:
-        # convolution
-        kernel = _variable_with_weight_decay(
-            'weights',
-            shape = [10, 5, params.num_filters, params.num_filters],
-            wd_value = None, use_fp16 = params.use_fp16)
-
-        ## N, 32, T, F
-        conv = tf.nn.conv2d(conv1, kernel,
+    with tf.variable_scope('conv2'):
+        # convolution: N, 32, T, F
+        kernel = _variable_with_weight_decay('weights',
+                                             shape = [10, 5, params.num_filters, params.num_filters],
+                                             wd_value=None,
+                                             use_fp16=params.use_fp16)
+        conv = tf.nn.conv2d(conv1,
+                            kernel,
                             [1, 1, 2, 1],
                             padding='VALID',
                             data_format='NCHW')
-        biases = _variable_on_cpu('biases', [params.num_filters],
+        biases = _variable_on_cpu('biases',
+                                  [params.num_filters],
                                   tf.constant_initializer(-0.05),
                                   params.use_fp16)
         bias = tf.nn.bias_add(conv, biases, data_format='NCHW')
-        ## N, 32, T, F
-        # batch normalization
+
+        # batch normalization: N, 32, T, F
         bn = custom_ops.batch_norm2(bias, data_format='NCHW')
 
         # clipped ReLU
@@ -169,6 +169,7 @@ def inference(sess, feats, seq_lens, params):
         # Make one instance of cell on a fixed device,
         # and use copies of the weights on other devices.
         cell_list = []
+        print "engine: ", params.engine
         if params.engine == 'mkldnn_rnn' or params.engine == 'cudnn_rnn':
           cell_list.append(MkldnnRNNCell(sess, params.num_hidden, input_size=75 * params.num_filters, use_fp16=params.use_fp16))
           for i in range(params.num_rnn_layers - 1):
@@ -185,10 +186,9 @@ def inference(sess, feats, seq_lens, params):
 
     # Linear layer(WX + b) - softmax is applied by CTC cost function.
     with tf.variable_scope('softmax_linear') as scope:
-        weights = _variable_with_weight_decay(
-            'weights', [NUM_CLASSES, params.num_hidden],
-            wd_value = None,
-            use_fp16 = params.use_fp16)
+        weights = _variable_with_weight_decay('weights', [NUM_CLASSES, params.num_hidden],
+                                              wd_value = None,
+                                              use_fp16 = params.use_fp16)
         biases = _variable_on_cpu('biases', [NUM_CLASSES],
                                   tf.constant_initializer(0.0),
                                   params.use_fp16)
@@ -224,35 +224,6 @@ def loss(logits, labels, seq_lens):
     # Calculate the average ctc loss across the batch.
     ctc_loss = tf.nn.ctc_loss(labels=labels, inputs=tf.cast(logits, tf.float32), sequence_length=seq_lens, preprocess_collapse_repeated=True, time_major=True)
     ctc_loss_mean = tf.reduce_mean(ctc_loss, name='ctc_loss')
-    tf.add_to_collection('losses', ctc_loss_mean)
 
-    # The total loss is defined as the cross entropy loss plus all
-    # of the weight decay terms (L2 loss).
-    return tf.add_n(tf.get_collection('losses'), name='total_loss')
+    return ctc_loss_mean
 
-
-def _add_loss_summaries(total_loss):
-    """Add summaries for losses in deepSpeech model.
-
-    Generates moving average for all losses and associated summaries for
-    visualizing the performance of the network.
-
-    Args:
-      total_loss: Total loss from loss().
-    Returns:
-      loss_averages_op: op for generating moving averages of losses.
-    """
-    # Compute the moving average of all individual losses and the total loss.
-    loss_averages = tf.train.ExponentialMovingAverage(0.9, name = 'avg')
-    losses = tf.get_collection('losses')
-    loss_averages_op = loss_averages.apply(losses + [total_loss])
-
-    # Attach a scalar summary to all individual losses and the total loss;
-    # do the same for the averaged version of the losses.
-    for each_loss in losses + [total_loss]:
-        # Name each loss as '(raw)' and name the moving average
-        # version of the loss as the original loss name.
-        tf.scalar_summary(each_loss.op.name + ' (raw)', each_loss)
-        tf.scalar_summary(each_loss.op.name, loss_averages.average(each_loss))
-
-    return loss_averages_op
