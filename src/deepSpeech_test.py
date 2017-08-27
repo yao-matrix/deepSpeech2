@@ -19,6 +19,7 @@ import argparse
 from datetime import datetime
 import numpy as np
 from Levenshtein import distance
+import distutils.util
 
 import tensorflow as tf
 
@@ -46,13 +47,16 @@ def parse_args():
     parser.add_argument('--data_dir', type=str,
                         default='../data/LibriSpeech/processed/',
                         help='Path to the deepSpeech data directory')
-    parser.add_argument('--run_once', type=int, default=0,
+    parser.add_argument('--run_once', type=distutils.util.strtobool, default=False,
                         help='Whether to run eval only once')
     parser.add_argument('--engine', type=str, default='tf',
                         help = 'Select the engine you use: tf, mkl, mkldnn_rnn, cudnn_rnn')
-    parser.add_argument('--nchw', type=int, default=1,
+    parser.add_argument('--nchw', type=distutils.util.strtobool, default=True,
                         help = 'Whether to use nchw memory layout')
     args = parser.parse_args()
+
+    print "nchw: ", args.nchw
+    print "engine: ", args.engine
 
     # Read saved parameters from file
     param_file = os.path.join(args.checkpoint_dir,
@@ -71,7 +75,7 @@ def parse_args():
 
 ARGS = parse_args()
 
-if ARGS.nchw is True:
+if ARGS.nchw:
   import deepSpeech_NCHW as deepSpeech
 else:
   import deepSpeech
@@ -171,7 +175,7 @@ def eval_once(sess, saver, summary_writer, predictions_op, summary_op,
             step += 1
 
         # Compute and print mean CER
-        avg_cer = np.mean(char_err_rate)*100
+        avg_cer = np.mean(char_err_rate) * 100
         print('%s: char_err_rate = %.3f %%' % (datetime.now(), avg_cer))
 
         # Add summary ops
@@ -191,7 +195,6 @@ def evaluate():
     """ Evaluate deepSpeech modelfor a number of steps."""
 
     with tf.Graph().as_default() as graph:
-
         # Get feats and labels for deepSpeech.
         feats, labels, seq_lens = deepSpeech.inputs(ARGS.eval_data,
                                                     data_dir=ARGS.data_dir,

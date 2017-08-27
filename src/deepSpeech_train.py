@@ -22,6 +22,7 @@ import argparse
 import json
 import sys
 import numpy as np
+import distutils.util
 
 import tensorflow as tf
 from tensorflow.python.client import device_lib
@@ -94,14 +95,19 @@ def parse_args():
                         help='Inter op thread num')
     parser.add_argument('--engine', type=str, default='tf',
                         help='Select the engine you use: tf, mkl, mkldnn_rnn, cudnn_rnn')
-    parser.add_argument('--debug', type=int, default=0,
+    parser.add_argument('--debug', type=distutils.util.strtobool, default=False,
                         help='Switch on to enable debug log')
-    parser.add_argument('--nchw', type=int, default=1,
+    parser.add_argument('--nchw', type=distutils.util.strtobool, default=True,
                         help='Whether to use nchw memory layout')
-    parser.add_argument('--dummy', type=int, default=0,
+    parser.add_argument('--dummy', type=distutils.util.strtobool, default=False,
                         help='Whether to use dummy data rather than librispeech data')
  
     args = parser.parse_args()
+
+    print "debug: ", args.debug
+    print "nchw: ", args.nchw
+    print "dummy: ", args.dummy
+    print "engine: ", args.engine
 
     # Read architecture hyper-parameters from checkpoint file
     # if one is provided.
@@ -123,13 +129,13 @@ def parse_args():
 
 ARGS = parse_args()
 
-if ARGS.nchw == 1:
+if ARGS.nchw:
   import deepSpeech_NCHW as deepSpeech
 else:
   import deepSpeech
 
 g = tf.Graph()
-if ARGS.dummy == 1:
+if ARGS.dummy:
     with g.as_default():
         feats_batch = tf.placeholder(dtype=tf.float32, shape=[None, None, deepSpeech_dummy.freq_bins])
         idx_batch = tf.placeholder(dtype=tf.int64)
@@ -235,24 +241,23 @@ def set_learning_rate():
     decay_steps = int(num_batches_per_epoch * ARGS.num_epochs_per_decay)
 
     # Decay the learning rate exponentially based on the number of steps.
-    learning_rate = tf.train.exponential_decay(
-        ARGS.initial_lr,
-        global_step,
-        decay_steps,
-        ARGS.lr_decay_factor,
-        staircase=True)
+    learning_rate = tf.train.exponential_decay(ARGS.initial_lr,
+                                               global_step,
+                                               decay_steps,
+                                               ARGS.lr_decay_factor,
+                                               staircase=True)
 
     return learning_rate, global_step
 
 
 def fetch_data():
     """ Fetch features, labels and sequence_lengths from a common queue."""
-    tot_batch_size = ARGS.batch_size * 1
-    feats, labels, seq_lens = deepSpeech.inputs(eval_data = 'train',
-                                                data_dir = ARGS.data_dir,
-                                                batch_size = tot_batch_size,
-                                                use_fp16 = ARGS.use_fp16,
-                                                shuffle = ARGS.shuffle)
+    tot_batch_size = ARGS.batch_size
+    feats, labels, seq_lens = deepSpeech.inputs(eval_data='train',
+                                                data_dir=ARGS.data_dir,
+                                                batch_size=tot_batch_size,
+                                                use_fp16=ARGS.use_fp16,
+                                                shuffle=ARGS.shuffle)
 
     # Split features and labels and sequence lengths for each tower
     return feats, labels, seq_lens
@@ -291,7 +296,7 @@ def run_train_loop(sess, operations, saver):
     run_options = None
     run_metadata = None
     trace_file = None
-    if ARGS.debug == 1:
+    if ARGS.debug:
         run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
         run_metadata = tf.RunMetadata()
         trace_file = open('profiling.json', 'w')
@@ -300,7 +305,7 @@ def run_train_loop(sess, operations, saver):
     for step in range(ARGS.max_steps):
         start_time = time.time()
         
-        if ARGS.dummy == 1:
+        if ARGS.dummy:
             feats, idx, vals, shape, seq_lens = deepSpeech_dummy.inputs(ARGS.batch_size)
             data_gen_time = time.time()
 
@@ -325,7 +330,7 @@ def run_train_loop(sess, operations, saver):
         # Print progress periodically
         if step > 10 and step % 10 == 0:
             examples_per_sec = (ARGS.batch_size * 1) / np.average(profiling)
-            if ARGS.dummy == 1:
+            if ARGS.dummy:
                 format_str = ('%s: step %d, '
                               'loss = %.2f (%.1f examples/sec; %.3f '
                               'sec/batch; '
@@ -341,7 +346,7 @@ def run_train_loop(sess, operations, saver):
                                     examples_per_sec, np.average(profiling) / 1))
 
         # Run the summary ops periodically
-        if step % 50 == 0 and ARGS.dummy == 0:
+        if step % 50 == 0 and not ARGS.dummy:
             summary_writer = tf.summary.FileWriter(ARGS.train_dir, sess.graph)
             summary_writer.add_summary(sess.run(summary_op), step)
 
@@ -350,7 +355,7 @@ def run_train_loop(sess, operations, saver):
             checkpoint_path = os.path.join(ARGS.train_dir, 'model.ckpt')
             saver.save(sess, checkpoint_path, global_step=step)
 
-        if ARGS.debug == 1 and step == 20:
+        if ARGS.debug and step == 20:
             trace = timeline.Timeline(run_metadata.step_stats)
             trace_file.write(trace.generate_chrome_trace_format())
 
@@ -425,7 +430,7 @@ def train():
         optimizer = tf.train.AdamOptimizer(learning_rate)
 
         # Fetch a batch worth of data for each tower
-        if ARGS.dummy == 0: 
+        if not ARGS.dummy: 
             data = fetch_data()
         else: 
             # idx, vals, s_shape = deepSpeech_dummy.dense_to_sparse(labels_batch, labels_batch_w, labels_batch_h)
@@ -476,7 +481,12 @@ def train():
             print "does not have checkpoint"
             sess.run(tf.global_variables_initializer())
 
-        if ARGS.dummy == 0:
+        variables_names = [v.name for v in tf.trainable_variables()]
+        values = sess.run(variables_names)
+        for k, v in zip(variables_names, values):
+            print "Variable: ", k
+
+        if not ARGS.dummy:
             # Start the queue runners.
             tf.train.start_queue_runners(sess)
 
