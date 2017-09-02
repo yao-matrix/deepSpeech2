@@ -83,12 +83,12 @@ def stacked_brnn(cell_fw, cell_bw, num_units, num_layers, inputs, seq_lengths, b
     :param batch_size:
     :return: the output of last layer bidirectional rnn with concatenating
     """
-    inputs = inputs
+    _inputs = inputs
     for i in range(num_layers):
         with tf.variable_scope("brnn-%d" % i) as scope:
             initial_state_fw = cell_fw[i].zero_state(batch_size, dtype=tf.float32)
             initial_state_bw = cell_bw[i].zero_state(batch_size, dtype=tf.float32)
-            (outputs, state) = tf.nn.bidirectional_dynamic_rnn(cell_fw[i], cell_bw[i], inputs, seq_lengths,
+            (outputs, state) = tf.nn.bidirectional_dynamic_rnn(cell_fw[i], cell_bw[i], _inputs, seq_lengths,
                                                                initial_state_fw, initial_state_bw, dtype=tf.float32, time_major=True,
                                                                scope=None) 
             outputs_fw, outputs_bw = outputs
@@ -145,19 +145,24 @@ def batch_norm2(inputs,
       params_shape = inputs_shape[1]
     else:
       params_shape = inputs_shape[-1]
-    # Allocate parameters for the beta and gamma of the normalization.
-    beta, gamma = None, None
-    if center:
-      beta = _variable_on_cpu('beta', params_shape, initializer=tf.zeros_initializer())
 
-    if scale:
-      gamma = _variable_on_cpu('gamma', params_shape, initializer=tf.ones_initializer())
- 
-    outputs, _, _ = tf.nn.fused_batch_norm(inputs, gamma, beta, mean=None, variance=None, epsilon=epsilon,
-                                           data_format=data_format, is_training=is_training)
-    outputs.set_shape(inputs.get_shape())
+    # shift
+    beta = _variable_on_cpu('beta', params_shape, initializer=tf.zeros_initializer())
+    # scale
+    gamma = _variable_on_cpu('gamma', params_shape, initializer=tf.ones_initializer())
 
-    return outputs
+    moving_mean = _variable_on_cpu('moving_mean', [params_shape], initializer=tf.zeros_initializer(), trainable=False)	
+    moving_var = _variable_on_cpu('moving_variance', [params_shape], initializer=tf.ones_initializer(), trainable=False)
+
+    if is_training:
+      y, batch_mean, batch_var = tf.nn.fused_batch_norm(inputs, gamma, beta, mean=None, variance=None, epsilon=epsilon,
+                                                        data_format=data_format, is_training=is_training)
+      moving_averages.assign_moving_average(moving_mean, batch_mean, decay)
+      moving_averages.assign_moving_average(moving_var, batch_var, decay)
+    else:
+      y, _, _ = tf.nn.fused_batch_norm(inputs, gamma, beta, mean=moving_mean, variance=moving_var, epsilon=epsilon,
+                                       data_format=data_format, is_training=is_training)  
+    return y
 
 
 def batch_norm(x, scope=None, is_train=True, data_format=None):

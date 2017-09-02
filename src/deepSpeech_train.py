@@ -108,6 +108,7 @@ def parse_args():
     print "nchw: ", args.nchw
     print "dummy: ", args.dummy
     print "engine: ", args.engine
+    print "initial lr: ", args.initial_lr
 
     # Read architecture hyper-parameters from checkpoint file
     # if one is provided.
@@ -351,7 +352,7 @@ def run_train_loop(sess, operations, saver):
             summary_writer.add_summary(sess.run(summary_op), step)
 
         # Save the model checkpoint periodically
-        if step % 10 == 0 or (step + 1) == ARGS.max_steps:
+        if step % 1000 == 0 or (step + 1) == ARGS.max_steps:
             checkpoint_path = os.path.join(ARGS.train_dir, 'model.ckpt')
             saver.save(sess, checkpoint_path, global_step=step)
 
@@ -458,11 +459,12 @@ def train():
                                                       global_step=global_step)
 
         # Track the moving averages of all trainable variables.
-        variable_averages = tf.train.ExponentialMovingAverage(ARGS.moving_avg_decay, global_step)
-        variables_averages_op = variable_averages.apply(tf.trainable_variables())
+        # variable_averages = tf.train.ExponentialMovingAverage(ARGS.moving_avg_decay, global_step)
+        # variables_averages_op = variable_averages.apply(tf.trainable_variables())
 
         # Group all updates to into a single train op.
-        train_op = tf.group(apply_gradient_op, variables_averages_op)
+        # train_op = tf.group(apply_gradient_op, variables_averages_op)
+        train_op = apply_gradient_op
 
         # Build summary op
         summary_op = add_summaries(summaries, learning_rate, grads)
@@ -481,10 +483,21 @@ def train():
             print "does not have checkpoint"
             sess.run(tf.global_variables_initializer())
 
-        variables_names = [v.name for v in tf.trainable_variables()]
-        values = sess.run(variables_names)
-        for k, v in zip(variables_names, values):
-            print "Variable: ", k
+        # print "Trainable Variables: "
+        # tvariables_names = [v.name for v in tf.trainable_variables()]
+        # tvalues = sess.run(tvariables_names)
+        # for k, v in zip(tvariables_names, tvalues):
+        #     print "Variable: ", k
+        # print "Global Variables: "
+        # gvariables_names = [v.name for v in tf.global_variables()]
+        # gvalues = sess.run(gvariables_names)
+        # for k, v in zip(gvariables_names, gvalues):
+        #     print "Variable: ", k
+        # print "Moving Average Variables: "
+        # mvariables_names = [v.name for v in tf.moving_average_variables()]
+        # mvalues = sess.run(mvariables_names)
+        # for k, v in zip(mvariables_names, mvalues):
+        #     print "Variable: ", k
 
         if not ARGS.dummy:
             # Start the queue runners.

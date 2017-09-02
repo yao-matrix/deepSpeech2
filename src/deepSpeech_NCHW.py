@@ -169,7 +169,7 @@ def inference(sess, feats, seq_lens, params):
         # Make one instance of cell on a fixed device,
         # and use copies of the weights on other devices.
         cell_list = []
-        print "engine: ", params.engine
+        # print "engine: ", params.engine
         if params.engine == 'mkldnn_rnn' or params.engine == 'cudnn_rnn':
           cell_list.append(MkldnnRNNCell(sess, params.num_hidden, input_size=75 * params.num_filters, use_fp16=params.use_fp16))
           for i in range(params.num_rnn_layers - 1):
