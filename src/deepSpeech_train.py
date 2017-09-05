@@ -52,8 +52,6 @@ def parse_args():
                         help='Whether to log device placement')
     parser.add_argument('--batch_size', type=int, default=32,
                         help='Number of inputs to process in a batch per GPU')
-    parser.add_argument('--temporal_stride', type=int, default=1,
-                        help='Stride along time')
 
     feature_parser = parser.add_mutually_exclusive_group(required=False)
     feature_parser.add_argument('--shuffle', dest='shuffle',
@@ -123,7 +121,6 @@ def parse_args():
             args.rnn_type = params['rnn_type']
             args.num_filters = params['num_filters']
             args.use_fp16 = params['use_fp16']
-            args.temporal_stride = params['temporal_stride']
             args.initial_lr = params['initial_lr']
             args.engine = params['engine']
     return args
