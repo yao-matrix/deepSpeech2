@@ -65,10 +65,13 @@ class CustomRNNCell2(BasicRNNCell):
             usize = state.get_shape()[1]
             u = _variable_on_cpu('U', [self._num_units, usize], initializer=tf.constant_initializer(0.0001), use_fp16=self.use_fp16)
             resu = tf.matmul(state, u, transpose_a=False, transpose_b=True)
+            # res_nb = tf.add_n([bn_resi, resu])
+            res_nb = tf.add(bn_resi, resu)
             bias = _variable_on_cpu('B', [self._num_units],
                                      tf.constant_initializer(0),
                                      use_fp16=self.use_fp16)
-            output = relux(tf.add(bn_resi, resu) + bias, capping=20)
+            res = tf.nn.bias_add(res_nb, bias)
+            output = relux(res, capping=20)
         return output, output
 
 
@@ -93,10 +96,11 @@ def stacked_brnn(cell_fw, cell_bw, num_units, num_layers, inputs, seq_lengths, b
                                                                scope=None) 
             outputs_fw, outputs_bw = outputs
             _inputs = outputs_fw + outputs_bw
+            # _inputs = tf.add_n([outputs_fw, outputs_bw])
     return _inputs
 
 
-def relux(x, capping = None):
+def relux(x, capping=None):
     """Clipped ReLU"""
     x = tf.nn.relu(x)
     if capping is not None:

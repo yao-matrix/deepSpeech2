@@ -87,7 +87,7 @@ def inference(sess, feats, seq_lens, params):
       params: parameters of the model.
 
     Returns:
-      Logits.
+      logits.
     """
     # We instantiate all variables using tf.get_variable() instead of
     # tf.Variable() in order to share variables across multiple GPU
@@ -109,10 +109,10 @@ def inference(sess, feats, seq_lens, params):
     #########################
     with tf.variable_scope('conv1') as scope:
         # convolution
-        kernel = _variable_with_weight_decay(
-            'weights',
-            shape = [20, 5, 1, params.num_filters],
-            wd_value=None, use_fp16=params.use_fp16)
+        kernel = _variable_with_weight_decay('weights',
+                                             shape=[20, 5, 1, params.num_filters],
+                                             wd_value=None,
+                                             use_fp16=params.use_fp16)
 
         ## N, T, F
         feats = tf.expand_dims(feats, axis=1)
@@ -121,13 +121,13 @@ def inference(sess, feats, seq_lens, params):
                             strides=[1, 1, 2, 2],
                             padding='VALID',
                             data_format='NCHW')
-        biases = _variable_on_cpu('biases', [params.num_filters],
-                                  tf.constant_initializer(-0.05),
-                                  params.use_fp16)
-        bias = tf.nn.bias_add(conv, biases, data_format='NCHW')
+        # biases = _variable_on_cpu('biases', [params.num_filters],
+        #                           tf.constant_initializer(-0.05),
+        #                          params.use_fp16)
+        # bias = tf.nn.bias_add(conv, biases, data_format='NCHW')
         ## N, 32, T, F
         # batch normalization
-        bn = custom_ops.batch_norm2(bias, data_format='NCHW')
+        bn = custom_ops.batch_norm2(conv, data_format='NCHW')
 
         # clipped ReLU
         conv1 = custom_ops.relux(bn, capping=20)
@@ -136,7 +136,7 @@ def inference(sess, feats, seq_lens, params):
     with tf.variable_scope('conv2'):
         # convolution: N, 32, T, F
         kernel = _variable_with_weight_decay('weights',
-                                             shape = [10, 5, params.num_filters, params.num_filters],
+                                             shape=[10, 5, params.num_filters, params.num_filters],
                                              wd_value=None,
                                              use_fp16=params.use_fp16)
         conv = tf.nn.conv2d(conv1,
@@ -144,14 +144,14 @@ def inference(sess, feats, seq_lens, params):
                             [1, 1, 2, 1],
                             padding='VALID',
                             data_format='NCHW')
-        biases = _variable_on_cpu('biases',
-                                  [params.num_filters],
-                                  tf.constant_initializer(-0.05),
-                                  params.use_fp16)
-        bias = tf.nn.bias_add(conv, biases, data_format='NCHW')
+        #biases = _variable_on_cpu('biases',
+        #                          [params.num_filters],
+        #                          tf.constant_initializer(-0.05),
+        #                          params.use_fp16)
+        #bias = tf.nn.bias_add(conv, biases, data_format='NCHW')
 
         # batch normalization: N, 32, T, F
-        bn = custom_ops.batch_norm2(bias, data_format='NCHW')
+        bn = custom_ops.batch_norm2(conv, data_format='NCHW')
 
         # clipped ReLU
         conv2 = custom_ops.relux(bn, capping=20)
@@ -164,14 +164,16 @@ def inference(sess, feats, seq_lens, params):
     with tf.variable_scope('rnn') as scope:
         # N, C, T, F => T, N, C, F
         rnn_input1 = tf.transpose(conv2, perm=[2, 0, 1, 3])
-        # Reshape conv output to fit rnn input: T, N, 32 * F
-        rnn_input = tf.reshape(rnn_input1, [-1, params.batch_size, 75 * params.num_filters])
+        fdim = rnn_input1.get_shape().dims
+        feat_dim = fdim[2].value * fdim[3].value
+        # Reshape conv output to fit rnn input: T, N, C * F
+        rnn_input = tf.reshape(rnn_input1, [-1, params.batch_size, feat_dim])
         # Make one instance of cell on a fixed device,
         # and use copies of the weights on other devices.
         cell_list = []
         # print "engine: ", params.engine
         if params.engine == 'mkldnn_rnn' or params.engine == 'cudnn_rnn':
-          cell_list.append(MkldnnRNNCell(sess, params.num_hidden, input_size=75 * params.num_filters, use_fp16=params.use_fp16))
+          cell_list.append(MkldnnRNNCell(sess, params.num_hidden, input_size=feat_dim, use_fp16=params.use_fp16))
           for i in range(params.num_rnn_layers - 1):
             cell_list.append(MkldnnRNNCell(sess, params.num_hidden, input_size=params.num_hidden, use_fp16=params.use_fp16))
         else:
