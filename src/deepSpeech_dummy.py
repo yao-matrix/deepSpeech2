@@ -29,7 +29,7 @@ NUM_PER_EPOCH_FOR_TRAIN = sum(counts) * scale_factor
 NUM_PER_EPOCH_FOR_EVAL = 2703
 NUM_PER_EPOCH_FOR_TEST = 2620
 
-def _init_data(batch_size):
+def  _init_data(batch_size):
     global g_batch_size
     global g_randomness
     global g_utter_counts
@@ -50,41 +50,46 @@ def _init_data(batch_size):
         for idx, val in enumerate(g_utter_counts):
             g_size = g_size + val
             g_duration = g_duration + val * utt_lengths[idx] / 100
+            # print g_randomness
+            # print g_randomness.shape
+            # print g_size
+            # print g_duration
 
 def _next(batch_size):
     _init_data(batch_size)
     global g_utter_counts
     global g_current
     if g_current >= len(g_utter_counts):
-        print "One Epoch Complete"
-        g_current = 0
-        g_utter_counts = [x * scale_factor * batch_size for x in counts]
-
-    inc = 0
-    l_batch_size = 0
-
-    if (g_utter_counts[g_current] > batch_size):
-        l_batch_size = batch_size
-        g_utter_counts[g_current] = g_utter_counts[g_current] - batch_size
-        inc = 0
+        return None
     else:
-        l_batch_size = g_utter_counts[g_current]
-        g_utter_counts[g_current] = 0
-        inc = 1
-    # print 'utter counts %d' % g_utter_counts[g_current]
-    utt_length = utt_lengths[g_current]
-    label_length = label_lengths[g_current]
-    start_idx = random.randint(0, extra + batch_size * (utt_lengths[-1] - utt_lengths[g_current]) - 1)
-    end_idx = start_idx + utt_length * l_batch_size
+        inc = 0
+        l_batch_size = 0
 
-    g_current = g_current + inc
-    label = range(label_length)
-    for x in range(label_length - 1):
-        label[x] = random.randint(0, NUM_CLASSES - 2)
-    label[label_length - 1] = NUM_CLASSES - 1
-    feat = g_randomness[start_idx : end_idx, :]
+        if (g_utter_counts[g_current] > batch_size):
+            l_batch_size = batch_size
+            g_utter_counts[g_current] = g_utter_counts[g_current] - batch_size
+            inc = 0
+        else:
+            l_batch_size = g_utter_counts[g_current]
+            g_utter_counts[g_current] = 0
+            inc = 1
+        # print 'utter counts %d' % g_utter_counts[g_current]
+        utt_length = utt_lengths[g_current]
+        label_length = label_lengths[g_current]
+        start_idx = random.randint(0, extra + batch_size * (utt_lengths[-1] - utt_lengths[g_current]) - 1)
 
-    return utt_length, feat, label
+        end_idx = start_idx + utt_length * l_batch_size
+
+        g_current = g_current + inc
+        label = range(label_length)
+        for x in range(label_length - 1):
+            label[x] = random.randint(0, NUM_CLASSES - 2)
+        label[label_length - 1] = NUM_CLASSES - 1
+        feat = g_randomness[start_idx : end_idx, :]
+        # print input.shape
+        # print utt_length
+        # print label
+        return utt_length, feat, label
 
 def _dense_to_sparse(dense):
     idx = []
@@ -105,9 +110,11 @@ def inputs(batch_size):
       feats: MFCC. 3D tensor of [batch_size, T, F] size.
       labels: Labels. 1D tensor of [batch_size] size.
       seq_lens: SeqLens. 1D tensor of [batch_size] size.
-    """
 
+    """
     utt_length, feat, label = _next(batch_size)
+
+    # print 'seq_len: %d' % utt_length
     seq_lens = np.full(batch_size, utt_length)
 
     feats = np.reshape(feat, [batch_size, utt_length, freq_bins])

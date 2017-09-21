@@ -34,35 +34,35 @@ def _generate_feats_and_label_batch(filename_queue, batch_size):
     reader = tf.TFRecordReader()
     _, serialized_example = reader.read(filename_queue)
     context_features = {
-        "seq_len": tf.FixedLenFeature([], dtype=tf.int64),
-        "labels": tf.VarLenFeature(dtype=tf.int64)
+        "seq_len": tf.FixedLenFeature([], dtype = tf.int64),
+        "labels": tf.VarLenFeature(dtype = tf.int64)
     }
     sequence_features = {
         # mfcc features are 161 dimensional
-        "feats": tf.FixedLenSequenceFeature([161, ], dtype=tf.float32) 
+        "feats": tf.FixedLenSequenceFeature([161, ], dtype = tf.float32) 
     }
 
     # Parse the example (returns a dictionary of tensors)
     context_parsed, sequence_parsed = tf.parse_single_sequence_example(
-        serialized=serialized_example,
-        context_features=context_features,
-        sequence_features=sequence_features
+        serialized = serialized_example,
+        context_features = context_features,
+        sequence_features = sequence_features
     )
 
     # Generate a batch worth of examples after bucketing
     seq_len, (feats, labels) = tf.contrib.training.bucket_by_sequence_length(
-        input_length=tf.cast(context_parsed['seq_len'], tf.int32),
-        tensors=[sequence_parsed['feats'], context_parsed['labels']],
-        batch_size=batch_size,
-        bucket_boundaries=list(range(100, 1900, 100)),
-        allow_smaller_final_batch=False,
-        num_threads=16,
-        dynamic_pad=True)
+        input_length = tf.cast(context_parsed['seq_len'], tf.int32),
+        tensors = [sequence_parsed['feats'], context_parsed['labels']],
+        batch_size = batch_size,
+        bucket_boundaries = list(range(100, 1900, 100)),
+        allow_smaller_final_batch = False,
+        num_threads = 16,
+        dynamic_pad = True)
 
     return feats, tf.cast(labels, tf.int32), seq_len
 
 
-def inputs(eval_data, data_dir, batch_size, shuffle=False):
+def inputs(eval_data, data_dir, batch_size, shuffle = False):
     """Construct input for fordspeech evaluation using the Reader ops.
 
     Args:
@@ -79,7 +79,7 @@ def inputs(eval_data, data_dir, batch_size, shuffle=False):
         num_files = len(glob.glob(os.path.join(data_dir, 'train*/*.tfrecords')))
         filenames = [os.path.join(data_dir, 'train-clean-100/train_' + str(i) + '.tfrecords')
                      for i in range(1, num_files + 1)]
-        # print filenames
+        print filenames
     elif eval_data == 'val':
         filenames = glob.glob(os.path.join(data_dir, 'dev*/*.tfrecords'))
 
@@ -91,7 +91,7 @@ def inputs(eval_data, data_dir, batch_size, shuffle=False):
             raise ValueError('Failed to find file: ' + file)
 
     # Create a queue that produces the filenames to read.
-    filename_queue = tf.train.string_input_producer(filenames, shuffle=shuffle)
+    filename_queue = tf.train.string_input_producer(filenames, shuffle = shuffle)
 
     # Generate a batch of images and labels by building up a queue of examples.
     return _generate_feats_and_label_batch(filename_queue, batch_size)

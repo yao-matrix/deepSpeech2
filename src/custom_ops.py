@@ -3,10 +3,10 @@ Custom RNN Cell definition.
 Default RNNCell in TensorFlow throws errors when
 variables are re-used between devices.
 """
-import tensorflow as tf
 
 from tensorflow.contrib.rnn import BasicRNNCell
 from tensorflow.python.util import nest
+import tensorflow as tf
 from tensorflow.python.training import moving_averages
 
 from helper_routines import _variable_on_cpu
@@ -19,7 +19,7 @@ class CustomRNNCell(BasicRNNCell):
     pin weights on one device (say cpu).
     """
 
-    def __init__(self, num_units, input_size=None, activation=tf.nn.relu6, use_fp16=False):
+    def __init__(self, num_units, activation = tf.nn.relu6, use_fp16 = False):
         self._num_units = num_units
         self._activation = activation
         self.use_fp16 = use_fp16
@@ -41,14 +41,14 @@ class CustomRNNCell2(BasicRNNCell):
     pin weights on one device (say cpu).
     """
 
-    def __init__(self, num_units, input_size=None, activation=tf.nn.relu6, use_fp16=False):
+    def __init__(self, num_units, activation = tf.nn.relu6, use_fp16 = False):
         self._num_units = num_units
         self.use_fp16 = use_fp16
 
-    def __call__(self, inputs, state, scope=None):
+    def __call__(self, inputs, state, scope = None):
         """Most basic RNN:
         output = new_state = activation(BN(W * input) + U * state + B).
-         state dim: batch_size * num_units
+         state dim: seq_len * num_units
          input dim: batch_size * feature_size
          W: feature_size * num_units
          U: num_units * num_units
@@ -57,28 +57,25 @@ class CustomRNNCell2(BasicRNNCell):
             # print "rnn cell input size: ", inputs.get_shape().as_list()
             # print "rnn cell state size: ", state.get_shape().as_list()
             wsize = inputs.get_shape()[1]
-            w = _variable_on_cpu('W', [self._num_units, wsize], initializer=tf.constant_initializer(0.0001), use_fp16=self.use_fp16)
-            resi = tf.matmul(inputs, w, transpose_a=False, transpose_b=True)
+            w = _variable_on_cpu('W', [self._num_units, wsize], use_fp16 = self.use_fp16)
+            resi = tf.matmul(inputs, w, transpose_a = False, transpose_b = True)
             # batch_size * num_units
             bn_resi = seq_batch_norm(resi)
             # bn_resi = resi
             usize = state.get_shape()[1]
-            u = _variable_on_cpu('U', [self._num_units, usize], initializer=tf.constant_initializer(0.0001), use_fp16=self.use_fp16)
-            resu = tf.matmul(state, u, transpose_a=False, transpose_b=True)
-            # res_nb = tf.add_n([bn_resi, resu])
-            res_nb = tf.add(bn_resi, resu)
+            u = _variable_on_cpu('U', [self._num_units, usize], use_fp16 = self.use_fp16)
+            resu = tf.matmul(state, u, transpose_a = False, transpose_b = True)
             bias = _variable_on_cpu('B', [self._num_units],
                                      tf.constant_initializer(0),
-                                     use_fp16=self.use_fp16)
-            res = tf.nn.bias_add(res_nb, bias)
-            output = relux(res, capping=20)
+                                     use_fp16 = self.use_fp16)
+            output = relux(tf.add(bn_resi, resu) + bias, capping = 20)
         return output, output
 
 
-def stacked_brnn(cell_fw, cell_bw, num_units, num_layers, inputs, seq_lengths, batch_size):
+def stacked_brnn(cell, num_units, num_layers, inputs, seq_lengths, batch_size):
     """
     multi layer bidirectional rnn
-    :param cell: RNN cell
+    :param cell: RNN class
     :param num_units: hidden unit of RNN cell
     :param num_layers: the number of layers
     :param inputs: the input sequence
@@ -86,21 +83,19 @@ def stacked_brnn(cell_fw, cell_bw, num_units, num_layers, inputs, seq_lengths, b
     :param batch_size:
     :return: the output of last layer bidirectional rnn with concatenating
     """
-    _inputs = inputs
-    for i in range(num_layers):
-        with tf.variable_scope("brnn-%d" % i) as scope:
-            initial_state_fw = cell_fw[i].zero_state(batch_size, dtype=tf.float32)
-            initial_state_bw = cell_bw[i].zero_state(batch_size, dtype=tf.float32)
-            (outputs, state) = tf.nn.bidirectional_dynamic_rnn(cell_fw[i], cell_bw[i], _inputs, seq_lengths,
-                                                               initial_state_fw, initial_state_bw, dtype=tf.float32, time_major=True,
-                                                               scope=None) 
+    inputs = inputs
+    for _ in range(num_layers):
+        with tf.variable_scope(None, default_name = "brnn"):
+            initial_state_fw = rnn_cell_fw.zero_state(batch_size, dtype = tf.float32)
+            initial_state_bw = rnn_cell_bw.zero_state(batch_size, dtype = tf.float32)
+            (outputs, state) = tf.nn.bidirectional_dynamic_rnn(cell, cell, _inputs, seq_lengths,
+                                                              initial_state_fw, initial_state_bw, dtype = tf.float32) 
             outputs_fw, outputs_bw = outputs
             _inputs = outputs_fw + outputs_bw
-            # _inputs = tf.add_n([outputs_fw, outputs_bw])
     return _inputs
 
 
-def relux(x, capping=None):
+def relux(x, capping = None):
     """Clipped ReLU"""
     x = tf.nn.relu(x)
     if capping is not None:
@@ -109,17 +104,17 @@ def relux(x, capping=None):
 
 
 def batch_norm2(inputs,
-                decay=0.999,
-                center=True,
-                scale=True,
-                epsilon=0.001,
-                moving_vars='moving_vars',
-                activation=None,
-                is_training=True,
-                trainable=True,
-                scope=None,
-                reuse=None,
-                data_format='NHWC'):
+               decay = 0.999,
+               center = True,
+               scale = True,
+               epsilon = 0.001,
+               moving_vars = 'moving_vars',
+               activation = None,
+               is_training = True,
+               trainable = True,
+               scope = None,
+               reuse = None,
+               data_format = 'NHWC'):
   """Adds a Batch Normalization layer.
 
   Args:
@@ -144,40 +139,37 @@ def batch_norm2(inputs,
 
   """
   inputs_shape = inputs.get_shape()
-  with tf.variable_scope('bn2', [inputs], reuse=reuse):
+  with tf.variable_scope(scope, 'bn2', [inputs], reuse = reuse):
+    axis = list(range(len(inputs_shape) - 1))
     if data_format == 'NCHW':
       params_shape = inputs_shape[1]
     else:
       params_shape = inputs_shape[-1]
+    # Allocate parameters for the beta and gamma of the normalization.
+    beta, gamma = None, None
+    if center:
+      beta = _variable_on_cpu('beta', params_shape, initializer = tf.zeros_initializer())
 
-    # shift
-    beta = _variable_on_cpu('beta', params_shape, initializer=tf.zeros_initializer())
-    # scale
-    gamma = _variable_on_cpu('gamma', params_shape, initializer=tf.ones_initializer())
+    if scale:
+      gamma = _variable_on_cpu('gamma', params_shape, initializer = tf.ones_initializer())
+ 
+    outputs, _, _ = tf.nn.fused_batch_norm(
+        inputs, gamma, beta, mean = None, variance = None, epsilon = epsilon,
+        data_format = data_format, is_training = is_training)
+    outputs.set_shape(inputs.get_shape())
 
-    moving_mean = _variable_on_cpu('moving_mean', [params_shape], initializer=tf.zeros_initializer(), trainable=False)	
-    moving_var = _variable_on_cpu('moving_variance', [params_shape], initializer=tf.ones_initializer(), trainable=False)
-
-    if is_training:
-      y, batch_mean, batch_var = tf.nn.fused_batch_norm(inputs, gamma, beta, mean=None, variance=None, epsilon=epsilon,
-                                                        data_format=data_format, is_training=is_training)
-      moving_averages.assign_moving_average(moving_mean, batch_mean, decay)
-      moving_averages.assign_moving_average(moving_var, batch_var, decay)
-    else:
-      y, _, _ = tf.nn.fused_batch_norm(inputs, gamma, beta, mean=moving_mean, variance=moving_var, epsilon=epsilon,
-                                       data_format=data_format, is_training=is_training)  
-    return y
+    return outputs
 
 
-def batch_norm(x, scope=None, is_train=True, data_format=None):
+def batch_norm(x, scope = None, is_train = True, data_format = None):
     """batch normalization, currently only work on NHWC"""
     with tf.variable_scope(scope or 'bn'):
         inputs_shape = x.get_shape()
         param_shape = inputs_shape[-1]        
-        beta = _variable_on_cpu('beta', [param_shape], initializer=tf.zeros_initializer())
-        gamma = _variable_on_cpu('gamma', [param_shape], initializer=tf.ones_initializer())
-        batch_mean, batch_var = tf.nn.moments(x, [0, 1, 2], name='moments')
-        ema = tf.train.ExponentialMovingAverage(decay=0.5, zero_debias=True)
+        beta = _variable_on_cpu('beta', [param_shape], initializer = tf.zeros_initializer())
+        gamma = _variable_on_cpu('gamma', [param_shape], initializer = tf.ones_initializer())
+        batch_mean, batch_var = tf.nn.moments(x, [0, 1, 2], name = 'moments')
+        ema = tf.train.ExponentialMovingAverage(decay = 0.5, zero_debias = True)
         def mean_var_with_update():
             ema_apply_op = ema.apply([batch_mean, batch_var])
             with tf.control_dependencies([ema_apply_op]):
@@ -190,25 +182,25 @@ def batch_norm(x, scope=None, is_train=True, data_format=None):
     return normed
 
 
-def seq_batch_norm(x, scope=None, is_train=True):
+def seq_batch_norm(x, scope = None, is_train = True):
     """sequence batch normalization, input N * D"""
     with tf.name_scope(None):
-        with tf.variable_scope("sbn", reuse=None):
+        with tf.variable_scope("sbn", reuse = False):
             inputs_shape = x.get_shape()
             param_shape = inputs_shape[-1]
-            beta = _variable_on_cpu('beta', [param_shape], initializer=tf.zeros_initializer(), trainable=False)
-            gamma = _variable_on_cpu('gamma', [param_shape], initializer=tf.ones_initializer(), trainable=False)
-            batch_mean, batch_var = tf.nn.moments(x, [0], name='moments')
+            beta = _variable_on_cpu('beta', [param_shape], initializer = tf.zeros_initializer(), trainable = False)
+            gamma = _variable_on_cpu('gamma', [param_shape], initializer = tf.ones_initializer(), trainable = False)
+            batch_mean, batch_var = tf.nn.moments(x, [0], name = 'moments')
 
-            moving_mean = _variable_on_cpu('moving_mean', [param_shape], initializer=tf.zeros_initializer(), trainable=False)	
-            moving_variance = _variable_on_cpu('moving_variance', [param_shape], initializer=tf.ones_initializer(), trainable=False)
+            moving_mean = _variable_on_cpu('moving_mean', [param_shape], initializer = tf.zeros_initializer(), trainable = False)	
+            moving_variance = _variable_on_cpu('moving_variance', [param_shape], initializer = tf.ones_initializer(), trainable = False)
             moving_averages.assign_moving_average(moving_mean, batch_mean, 0.5)
             moving_averages.assign_moving_average(moving_variance, batch_var, 0.5)
             normed = tf.nn.batch_normalization(x, moving_mean, moving_variance, beta, gamma, 1e-5)
     return normed
 
 
-def _linear(args, output_size, bias, scope=None, use_fp16=False):
+def _linear(args, output_size, bias, scope = None, use_fp16 = False):
     """Linear map: sum_i(args[i] * W[i]), where W[i] is a variable.
 
     Args:
@@ -255,9 +247,9 @@ def _linear(args, output_size, bias, scope=None, use_fp16=False):
             dtype = tf.float32
         args = [tf.cast(x, dtype) for x in args]
         if len(args) == 1:
-            res = tf.matmul(args[0], matrix, transpose_a=False, transpose_b=True)
+            res = tf.matmul(args[0], matrix, transpose_a = False, transpose_b = True)
         else:
-            res = tf.matmul(tf.concat(args, 1), matrix, transpose_a=False, transpose_b=True)
+            res = tf.matmul(tf.concat(args, 1), matrix, transpose_a = False, transpose_b = True)
         if not bias:
             return res
         bias_term = _variable_on_cpu('Bias', [output_size],
