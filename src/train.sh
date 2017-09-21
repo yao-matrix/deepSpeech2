@@ -1,9 +1,12 @@
 #!/bin/bash
+# This script trains a deepspeech model in tensorflow with sorta-grad.
+# usage ./train.sh  or  ./train.sh dummy
+
 
 clear
 cur_dir=$(cd "$(dirname $0)";pwd)
-# echo ${cur_dir}
-export PYTHONPATH=${cur_path}:$PYTHONPATH
+echo ${cur_dir}
+export PYTHONPATH=${cur_path}:/home/matrix/inteltf/:$PYTHONPATH
 # echo $PYTHONPATH
 export LD_LIBRARY_PATH=/usr/local/cuda/extras/CUPTI/lib64/:$LD_LIBRARY_PATH
 
@@ -12,37 +15,29 @@ export LD_LIBRARY_PATH=/usr/local/cuda/extras/CUPTI/lib64/:$LD_LIBRARY_PATH
 
 # environment variables
 unset TF_CPP_MIN_VLOG_LEVEL
-# export TF_CPP_MIN_VLOG_LEVEL=2
+# export TF_CPP_MIN_VLOG_LEVEL=1
+
+# echo "Training on utterances in order sorted by length"
+#export CUDA_VISIBLE_DEVICES=0,1
+# filename='../models/librispeech/train'
+# datadir='../data/LibriSpeech/processed/'
+# python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 280 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --train_dir $filename --data_dir $datadir --use_fp32
 
 # clear
 echo "-----------------------------------"
 echo "Start training"
-
-dummy=True   # True or False
-nchw=True    # True or False
-debug=False  # True or False
-engine="mkl" # tf, mkl, cudnn_rnn, mkldnn_rnn
-
-# echo $dummy
-
-config_check_one=`test "${nchw}" = "False" && test "${engine}"x = "tf"x -o "${engine}"x = "cudnn_rnn"x && echo 'OK'`
-# echo "check one: "$config_check_one
-config_check_two=`test "${nchw}" = "True" && test "${engine}"x == "mkl"x -o "${engine}"x = "mkldnn_rnn"x && echo 'OK'`
-# echo "check two: "$config_check_two
-check=`test ${config_check_one}x = "OK"x -o ${config_check_two}x = "OK"x && echo 'OK'`
-# echo "check: "$check
-
-if [[ ${check}x != "OK"x ]];then
-    echo "unsupported configuration conbimation"
-    exit -1
-fi
-
 filename='../models/librispeech/train'
 datadir='../data/LibriSpeech/processed/'
-python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --num_filters 32 --initial_lr 1e-6 --train_dir $filename --data_dir $datadir --debug ${debug} --nchw ${nchw} --engine ${engine} --dummy ${dummy}
-
-echo "Done"
+python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --rnn_type 'bi-dir' --num_filters 32 --initial_lr 1e-4 --temporal_stride 4 --train_dir $filename --data_dir $datadir
 
 # deactivate Intel Python
 # source /opt/intel/intelpython2/bin/deactivate
+
+# clear
+# echo "-----------------------------------"
+# echo "Training now on dummy data"
+# filename='../models/dummy/train'
+# python deepSpeech_train.py --batch_size 32 --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --num_filters 32 --checkpoint ../models/dummy --train_dir $filename
+
+
 

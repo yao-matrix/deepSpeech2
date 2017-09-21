@@ -78,7 +78,7 @@ def inputs(eval_data, data_dir, batch_size, use_fp16, shuffle):
     return feats, labels, seq_lens
 
 
-def inference(session, feats, seq_lens, params):
+def inference(feats, seq_lens, params):
     """Build the deepSpeech model.
 
     Args:

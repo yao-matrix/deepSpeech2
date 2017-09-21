@@ -67,20 +67,20 @@ def make_example(seq_len, spec_feat, labels):
 
     '''
     # Feature lists for the sequential features of the example
-    feats_list = [tf.train.Feature(float_list=tf.train.FloatList(value=frame))
+    feats_list = [tf.train.Feature(float_list = tf.train.FloatList(value = frame))
                   for frame in spec_feat]
-    feat_dict = {"feats": tf.train.FeatureList(feature=feats_list)}
-    sequence_feats = tf.train.FeatureLists(feature_list=feat_dict)
+    feat_dict = {"feats": tf.train.FeatureList(feature = feats_list)}
+    sequence_feats = tf.train.FeatureLists(feature_list = feat_dict)
 
     # Context features for the entire sequence
-    len_feat = tf.train.Feature(int64_list=tf.train.Int64List(value=[seq_len]))
-    label_feat = tf.train.Feature(int64_list=tf.train.Int64List(value=labels))
+    len_feat = tf.train.Feature(int64_list = tf.train.Int64List(value = [seq_len]))
+    label_feat = tf.train.Feature(int64_list = tf.train.Int64List(value = labels))
 
-    context_feats = tf.train.Features(feature={"seq_len": len_feat,
-                                               "labels": label_feat})
+    context_feats = tf.train.Features(feature = {"seq_len": len_feat,
+                                                 "labels": label_feat})
 
-    ex = tf.train.SequenceExample(context=context_feats,
-                                  feature_lists=sequence_feats)
+    ex = tf.train.SequenceExample(context = context_feats,
+                                  feature_lists = sequence_feats)
 
     return ex.SerializeToString()
 
@@ -129,7 +129,7 @@ def create_records():
             continue
         print('Processing' + partition)
         feats, transcripts, utt_len = process_data(partition)
-        sorted_utts = sorted(utt_len, key=utt_len.get)
+        sorted_utts = sorted(utt_len, key = utt_len.get)
         # bin into groups of 100 frames.
         max_t = int(utt_len[sorted_utts[-1]] / 100)
         min_t = int(utt_len[sorted_utts[0]] / 100)
@@ -177,7 +177,7 @@ def create_records():
 
 # Audio path is the location of the directory that contains the librispeech
 # data partitioned into three folders: dev-clean, train-clean-100, test-clean
-AUDIO_PATH = '../data/LibriSpeech/audio'
+AUDIO_PATH = '../data/LibriSpeech'
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ' "
 CHAR_TO_IX = {ch: i for (i, ch) in enumerate(ALPHABET)}
 
