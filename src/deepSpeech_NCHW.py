@@ -110,7 +110,7 @@ def inference(sess, feats, seq_lens, params):
     with tf.variable_scope('conv1') as scope:
         # convolution
         kernel = _variable_with_weight_decay('weights',
-                                             shape=[20, 5, 1, params.num_filters],
+                                             shape=[11, 41, 1, params.num_filters],
                                              wd_value=None,
                                              use_fp16=params.use_fp16)
 
@@ -118,8 +118,8 @@ def inference(sess, feats, seq_lens, params):
         feats = tf.expand_dims(feats, axis=1)
         ## N, 1, T, F
         conv = tf.nn.conv2d(feats, kernel,
-                            strides=[1, 1, 2, 2],
-                            padding='VALID',
+                            strides=[1, 1, 3, 2],
+                            padding='SAME',
                             data_format='NCHW')
         # biases = _variable_on_cpu('biases', [params.num_filters],
         #                           tf.constant_initializer(-0.05),
@@ -136,13 +136,13 @@ def inference(sess, feats, seq_lens, params):
     with tf.variable_scope('conv2'):
         # convolution: N, 32, T, F
         kernel = _variable_with_weight_decay('weights',
-                                             shape=[10, 5, params.num_filters, params.num_filters],
+                                             shape=[11, 21, params.num_filters, params.num_filters],
                                              wd_value=None,
                                              use_fp16=params.use_fp16)
         conv = tf.nn.conv2d(conv1,
                             kernel,
-                            [1, 1, 2, 1],
-                            padding='VALID',
+                            [1, 1, 1, 2],
+                            padding='SAME',
                             data_format='NCHW')
         #biases = _variable_on_cpu('biases',
         #                          [params.num_filters],

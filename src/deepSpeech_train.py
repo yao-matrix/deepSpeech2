@@ -280,11 +280,13 @@ def get_loss_grads(sess, data, optimizer):
                 # Retain the summaries from the final tower.
                 summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
 
-                # Calculate the gradients for the batch of
-                # data on this tower.
+                # Calculate the gradients for the batch of data.
                 grads_and_vars = optimizer.compute_gradients(loss)
 
-    return loss, grads_and_vars, summaries
+                # Clip the gradients.
+                clipped_grads_and_vars = [(tf.clip_by_value(grad, clip_value_min=400, clip_value_max=400), var) for grad, var in grads_and_vars]
+
+    return loss, clipped_grads_and_vars, summaries
 
 
 def run_train_loop(sess, operations, saver):
