@@ -21,6 +21,7 @@ import time
 import argparse
 import json
 import sys
+import logging
 import numpy as np
 import distutils.util
 
@@ -336,14 +337,14 @@ def run_train_loop(sess, operations, saver):
                               'sec/batch; '
                               '%.3f dummy sec/batch)')
                 print(format_str % (datetime.now(), step, loss_value,
-                                    examples_per_sec, np.average(profiling) / 1,
-                                    dummy_input_duration))
+                      examples_per_sec, np.average(profiling) / 1,
+                      dummy_input_duration))
             else:
                 format_str = ('%s: step %d, '
                               'loss = %.2f (%.1f examples/sec; %.3f '
                               'sec/batch)')
                 print(format_str % (datetime.now(), step, loss_value,
-                                    examples_per_sec, np.average(profiling) / 1))
+                      examples_per_sec, np.average(profiling) / 1))
 
         # Run the summary ops periodically
         if step % 50 == 0 and not ARGS.dummy:
@@ -351,11 +352,11 @@ def run_train_loop(sess, operations, saver):
             summary_writer.add_summary(sess.run(summary_op), step)
 
         # Save the model checkpoint periodically
-        if step % 1000 == 0 or (step + 1) == ARGS.max_steps:
+        if step % 10000 == 0 or (step + 1) == ARGS.max_steps:
             checkpoint_path = os.path.join(ARGS.train_dir, 'model.ckpt')
             saver.save(sess, checkpoint_path, global_step=step)
 
-        if ARGS.debug and step == 20:
+        if ARGS.debug and step == 200:
             trace = timeline.Timeline(run_metadata.step_stats)
             trace_file.write(trace.generate_chrome_trace_format())
 
@@ -476,10 +477,10 @@ def train():
 
         # Initialize vars.
         if ARGS.checkpoint is not None:
-            print "has checkpoint"
+            print "can use checkpoint"
             global_step = initialize_from_checkpoint(sess, saver)
         else:
-            print "does not have checkpoint"
+            print "cannot use checkpoint"
             sess.run(tf.global_variables_initializer())
 
         # print "Trainable Variables: "
