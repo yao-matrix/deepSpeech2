@@ -456,12 +456,11 @@ def train():
                                                       global_step=global_step)
 
         # Track the moving averages of all trainable variables.
-        # variable_averages = tf.train.ExponentialMovingAverage(ARGS.moving_avg_decay, global_step)
-        # variables_averages_op = variable_averages.apply(tf.trainable_variables())
+        variable_averages = tf.train.ExponentialMovingAverage(ARGS.moving_avg_decay, global_step)
+        variables_averages_op = variable_averages.apply(tf.trainable_variables())
 
         # Group all updates to into a single train op.
-        # train_op = tf.group(apply_gradient_op, variables_averages_op)
-        train_op = apply_gradient_op
+        train_op = tf.group(apply_gradient_op, variables_averages_op)
 
         # Build summary op
         summary_op = add_summaries(summaries, learning_rate, grads)
