@@ -284,9 +284,9 @@ def get_loss_grads(sess, data, optimizer):
                 grads_and_vars = optimizer.compute_gradients(loss)
 
                 # Clip the gradients.
-                # clipped_grads_and_vars = [(tf.clip_by_value(grad, clip_value_min=400, clip_value_max=400), var) for grad, var in grads_and_vars]
+                clipped_grads_and_vars = [(tf.clip_by_value(grad, clip_value_min=400, clip_value_max=400), var) for grad, var in grads_and_vars]
 
-    return loss, grads_and_vars, summaries
+    return loss, clipped_grads_and_vars, summaries
 
 
 def run_train_loop(sess, operations, saver):
