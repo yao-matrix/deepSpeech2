@@ -37,9 +37,9 @@ if [[ ${check}x != "OK"x ]];then
     exit -1
 fi
 
-filename='../models/librispeech/train'
-datadir='../data/LibriSpeech/processed/'
-python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --num_filters 32 --initial_lr 1e-6 --train_dir $filename --data_dir $datadir --debug ${debug} --nchw ${nchw} --engine ${engine} --dummy ${dummy}
+model_dir='../models/librispeech/train'
+data_dir='../data/LibriSpeech/processed/'
+python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --num_filters 32 --initial_lr 1e-6 --train_dir $model_dir --data_dir $data_dir --debug ${debug} --nchw ${nchw} --engine ${engine} --dummy ${dummy}
 
 echo "Done"
 

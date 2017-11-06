@@ -280,9 +280,11 @@ def get_loss_grads(sess, data, optimizer):
                 # Retain the summaries from the final tower.
                 summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
 
-                # Calculate the gradients for the batch of
-                # data on this tower.
+                # Calculate the gradients for the batch of data.
                 grads_and_vars = optimizer.compute_gradients(loss)
+
+                # Clip the gradients.
+                # clipped_grads_and_vars = [(tf.clip_by_value(grad, clip_value_min=400, clip_value_max=400), var) for grad, var in grads_and_vars]
 
     return loss, grads_and_vars, summaries
 
@@ -334,14 +336,14 @@ def run_train_loop(sess, operations, saver):
                               'sec/batch; '
                               '%.3f dummy sec/batch)')
                 print(format_str % (datetime.now(), step, loss_value,
-                                    examples_per_sec, np.average(profiling) / 1,
-                                    dummy_input_duration))
+                      examples_per_sec, np.average(profiling) / 1,
+                      dummy_input_duration))
             else:
                 format_str = ('%s: step %d, '
                               'loss = %.2f (%.1f examples/sec; %.3f '
                               'sec/batch)')
                 print(format_str % (datetime.now(), step, loss_value,
-                                    examples_per_sec, np.average(profiling) / 1))
+                      examples_per_sec, np.average(profiling) / 1))
 
         # Run the summary ops periodically
         if step % 50 == 0 and not ARGS.dummy:
@@ -473,10 +475,10 @@ def train():
 
         # Initialize vars.
         if ARGS.checkpoint is not None:
-            print "has checkpoint"
+            print "can use checkpoint"
             global_step = initialize_from_checkpoint(sess, saver)
         else:
-            print "does not have checkpoint"
+            print "cannot use checkpoint"
             sess.run(tf.global_variables_initializer())
 
         # print "Trainable Variables: "

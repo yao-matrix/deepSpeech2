@@ -57,13 +57,13 @@ class CustomRNNCell2(BasicRNNCell):
             # print "rnn cell input size: ", inputs.get_shape().as_list()
             # print "rnn cell state size: ", state.get_shape().as_list()
             wsize = inputs.get_shape()[1]
-            w = _variable_on_cpu('W', [self._num_units, wsize], initializer=tf.constant_initializer(0.0001), use_fp16=self.use_fp16)
+            w = _variable_on_cpu('W', [self._num_units, wsize], initializer=tf.orthogonal_initializer(), use_fp16=self.use_fp16)
             resi = tf.matmul(inputs, w, transpose_a=False, transpose_b=True)
             # batch_size * num_units
             bn_resi = seq_batch_norm(resi)
             # bn_resi = resi
             usize = state.get_shape()[1]
-            u = _variable_on_cpu('U', [self._num_units, usize], initializer=tf.constant_initializer(0.0001), use_fp16=self.use_fp16)
+            u = _variable_on_cpu('U', [self._num_units, usize], initializer=tf.orthogonal_initializer(), use_fp16=self.use_fp16)
             resu = tf.matmul(state, u, transpose_a=False, transpose_b=True)
             # res_nb = tf.add_n([bn_resi, resu])
             res_nb = tf.add(bn_resi, resu)
@@ -83,7 +83,7 @@ def stacked_brnn(cell_fw, cell_bw, num_units, num_layers, inputs, seq_lengths, b
     :param num_layers: the number of layers
     :param inputs: the input sequence
     :param seq_lengths: sequence length
-    :param batch_size:
+    :param batch_size: batch size
     :return: the output of last layer bidirectional rnn with concatenating
     """
     _inputs = inputs
@@ -202,8 +202,8 @@ def seq_batch_norm(x, scope=None, is_train=True):
 
             moving_mean = _variable_on_cpu('moving_mean', [param_shape], initializer=tf.zeros_initializer(), trainable=False)	
             moving_variance = _variable_on_cpu('moving_variance', [param_shape], initializer=tf.ones_initializer(), trainable=False)
-            moving_averages.assign_moving_average(moving_mean, batch_mean, 0.5)
-            moving_averages.assign_moving_average(moving_variance, batch_var, 0.5)
+            moving_averages.assign_moving_average(moving_mean, batch_mean, 0.997)
+            moving_averages.assign_moving_average(moving_variance, batch_var, 0.997)
             normed = tf.nn.batch_normalization(x, moving_mean, moving_variance, beta, gamma, 1e-5)
     return normed
 
