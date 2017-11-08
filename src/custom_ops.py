@@ -48,7 +48,7 @@ class CustomRNNCell2(BasicRNNCell):
     def __call__(self, inputs, state, scope = None):
         """Most basic RNN:
         output = new_state = activation(BN(W * input) + U * state + B).
-         state dim: seq_len * num_units
+         state dim: batch_size * num_units
          input dim: batch_size * feature_size
          W: feature_size * num_units
          U: num_units * num_units
@@ -57,18 +57,21 @@ class CustomRNNCell2(BasicRNNCell):
             # print "rnn cell input size: ", inputs.get_shape().as_list()
             # print "rnn cell state size: ", state.get_shape().as_list()
             wsize = inputs.get_shape()[1]
-            w = _variable_on_cpu('W', [self._num_units, wsize], use_fp16 = self.use_fp16)
-            resi = tf.matmul(inputs, w, transpose_a = False, transpose_b = True)
+            w = _variable_on_cpu('W', [self._num_units, wsize], initializer=tf.constant_initializer(0.0001), use_fp16=self.use_fp16)
+            resi = tf.matmul(inputs, w, transpose_a=False, transpose_b=True)
             # batch_size * num_units
             bn_resi = seq_batch_norm(resi)
             # bn_resi = resi
             usize = state.get_shape()[1]
-            u = _variable_on_cpu('U', [self._num_units, usize], use_fp16 = self.use_fp16)
-            resu = tf.matmul(state, u, transpose_a = False, transpose_b = True)
+            u = _variable_on_cpu('U', [self._num_units, usize], initializer=tf.constant_initializer(0.0001), use_fp16=self.use_fp16)
+            resu = tf.matmul(state, u, transpose_a=False, transpose_b=True)
+            # res_nb = tf.add_n([bn_resi, resu])
+            res_nb = tf.add(bn_resi, resu)
             bias = _variable_on_cpu('B', [self._num_units],
                                      tf.constant_initializer(0),
-                                     use_fp16 = self.use_fp16)
-            output = relux(tf.add(bn_resi, resu) + bias, capping = 20)
+                                     use_fp16=self.use_fp16)
+            res = tf.nn.bias_add(res_nb, bias)
+            output = relux(res, capping=20)
         return output, output
 
 

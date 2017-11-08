@@ -245,23 +245,20 @@ def set_learning_rate():
     """ Set up learning rate schedule """
 
     # Create a variable to count the number of train() calls.
-    # This equals the number of batches processed * ARGS.num_gpus.
-    global_step = tf.get_variable(
-        'global_step', [],
-        initializer = tf.constant_initializer(0), trainable = False)
+    # This equals the number of batches processed.
+    global_step = tf.get_variable('global_step', [],
+                                  initializer=tf.constant_initializer(0), trainable=False)
 
     # Calculate the learning rate schedule.
-    num_batches_per_epoch = (deepSpeech.NUM_PER_EPOCH_FOR_TRAIN /
-                             ARGS.batch_size)
+    num_batches_per_epoch = (deepSpeech.NUM_PER_EPOCH_FOR_TRAIN / ARGS.batch_size)
     decay_steps = int(num_batches_per_epoch * ARGS.num_epochs_per_decay)
 
     # Decay the learning rate exponentially based on the number of steps.
-    learning_rate = tf.train.exponential_decay(
-        ARGS.initial_lr,
-        global_step,
-        decay_steps,
-        ARGS.lr_decay_factor,
-        staircase = True)
+    learning_rate = tf.train.exponential_decay(ARGS.initial_lr,
+                                               global_step,
+                                               decay_steps,
+                                               ARGS.lr_decay_factor,
+                                               staircase=True)
 
     return learning_rate, global_step
 

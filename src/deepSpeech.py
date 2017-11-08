@@ -120,13 +120,13 @@ def inference(feats, seq_lens, params):
         conv = tf.nn.conv2d(feats, kernel,
                             [1, 2, 2, 1],
                             padding = 'VALID')
-        biases = _variable_on_cpu('biases', [params.num_filters],
-                                  tf.constant_initializer(-0.05),
-                                  params.use_fp16)
-        bias = tf.nn.bias_add(conv, biases)
+        #biases = _variable_on_cpu('biases', [params.num_filters],
+        #                          tf.constant_initializer(-0.05),
+        #                          params.use_fp16)
+        #bias = tf.nn.bias_add(conv, biases)
         ## N, T, F, 32
         # batch normalization
-        bn = custom_ops.batch_norm(bias)
+        bn = custom_ops.batch_norm(conv)
 
         # clipped ReLU
         conv1 = custom_ops.relux(bn, capping = 20)
@@ -143,13 +143,13 @@ def inference(feats, seq_lens, params):
         conv = tf.nn.conv2d(conv1, kernel,
                             [1, 2, 1, 1],
                             padding = 'VALID')
-        biases = _variable_on_cpu('biases', [params.num_filters],
-                                  tf.constant_initializer(-0.05),
-                                  params.use_fp16)
-        bias = tf.nn.bias_add(conv, biases)
+        #biases = _variable_on_cpu('biases', [params.num_filters],
+        #                          tf.constant_initializer(-0.05),
+        #                          params.use_fp16)
+        #bias = tf.nn.bias_add(conv, biases)
         ## N, T, F, 32
         # batch normalization
-        bn = custom_ops.batch_norm(bias)
+        bn = custom_ops.batch_norm(conv)
 
         # clipped ReLU
         conv2 = custom_ops.relux(bn, capping = 20)
