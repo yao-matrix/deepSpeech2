@@ -28,13 +28,13 @@ engine="mkl" # tf, mkl, cudnn_rnn, mkldnn_rnn
 config_check_one=`test "${nchw}" = "False" && test "${engine}"x = "tf"x -o "${engine}"x = "cudnn_rnn"x && echo 'OK'`
 # echo "check one: "$config_check_one
 config_check_two=`test "${nchw}" = "True" && test "${engine}"x == "mkl"x -o "${engine}"x = "mkldnn_rnn"x && echo 'OK'`
-#echo "check two: "$config_check_two
+# echo "check two: "$config_check_two
 check=`test ${config_check_one}x = "OK"x -o ${config_check_two}x = "OK"x && echo 'OK'`
 # echo "check: "$check
 
 if [[ ${check}x != "OK"x ]];then
     echo "unsupported configuration conbimation"
-#    exit -1
+    exit -1
 fi
 
 model_dir='../models/librispeech/train'

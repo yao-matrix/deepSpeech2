@@ -40,8 +40,8 @@ $ pip install --upgrade 'tensorflow-gpu==1.2.0'
 ```
 *Step 2: Clone this git repo.*
 ```shell
-(SpeechRecog)$ git clone https://github.com/yao-matrix/deepSpeech.git
-(SpeechRecog)$ cd deepSpeech
+$ git clone https://github.com/yao-matrix/deepSpeech2.git
+$ cd deepSpeech
 ```
 
 Preprocessing the data
