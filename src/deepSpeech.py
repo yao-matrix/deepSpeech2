@@ -21,12 +21,13 @@ Summary of major functions:
 
 
 import tensorflow as tf
-import deepSpeech_input
-import deepSpeech_dummy
-import custom_ops
+
 from helper_routines import _variable_on_cpu
 from helper_routines import _variable_with_weight_decay
 from helper_routines import _activation_summary
+import custom_ops
+import deepSpeech_input
+import deepSpeech_dummy
 
 # Global constants describing the speech data set.
 NUM_CLASSES = deepSpeech_input.NUM_CLASSES
@@ -69,16 +70,16 @@ def inputs(eval_data, data_dir, batch_size, use_fp16, shuffle):
     if not data_dir:
         raise ValueError('Please supply a data_dir')
     print 'Using Libri Data'
-    feats, labels, seq_lens = deepSpeech_input.inputs(eval_data = eval_data,
-                                                      data_dir = data_dir,
-                                                      batch_size = batch_size,
-                                                      shuffle = shuffle)
+    feats, labels, seq_lens = deepSpeech_input.inputs(eval_data=eval_data,
+                                                      data_dir=data_dir,
+                                                      batch_size=batch_size,
+                                                      shuffle=shuffle)
     if use_fp16:
         feats = tf.cast(feats, tf.float16)
     return feats, labels, seq_lens
 
 
-def inference(session, feats, seq_lens, params):
+def inference(sess, feats, seq_lens, params):
     """Build the deepSpeech model.
 
     Args:
@@ -87,7 +88,7 @@ def inference(session, feats, seq_lens, params):
       params: parameters of the model.
 
     Returns:
-      Logits.
+      logits.
     """
     # We instantiate all variables using tf.get_variable() instead of
     # tf.Variable() in order to share variables across multiple GPU
@@ -100,103 +101,94 @@ def inference(session, feats, seq_lens, params):
     else:
         dtype = tf.float32
 
-    feat_len = feats.get_shape().as_list()[-1]
+
     # data layout: N, T, F
+    # feat_len = feats.get_shape().as_list()[-1]
     # print "feat shape: ", feats.get_shape().as_list()
 
     #########################
     #  convolutional layers
     #########################
     with tf.variable_scope('conv1') as scope:
-        # convolution
-        kernel = _variable_with_weight_decay(
-            'weights',
-            shape = [20, 5, 1, params.num_filters],
-            wd_value = None, use_fp16 = params.use_fp16)
+        ## N, T, F
+        feats = tf.expand_dims(feats, axis=1)
 
-        ## N. T, F
-        feats = tf.expand_dims(feats, dim = -1)
         ## N, T, F, 1
+        # convolution
+        kernel = _variable_with_weight_decay('weights',
+                                             shape=[20, 5, 1, params.num_filters],
+                                             wd_value=None,
+                                             use_fp16=params.use_fp16)
         conv = tf.nn.conv2d(feats, kernel,
                             [1, 2, 2, 1],
-                            padding = 'VALID')
-        biases = _variable_on_cpu('biases', [params.num_filters],
-                                  tf.constant_initializer(-0.05),
-                                  params.use_fp16)
-        bias = tf.nn.bias_add(conv, biases)
+                            padding='VALID')
+        # biases = _variable_on_cpu('biases', [params.num_filters],
+        #                           tf.constant_initializer(-0.05),
+        #                          params.use_fp16)
+        # bias = tf.nn.bias_add(conv, biases)
+
         ## N, T, F, 32
         # batch normalization
-        bn = custom_ops.batch_norm(bias)
+        bn = custom_ops.batch_norm(conv)
 
         # clipped ReLU
-        conv1 = custom_ops.relux(bn, capping = 20)
+        conv1 = custom_ops.relux(bn, capping=20)
         _activation_summary(conv1)
 
     with tf.variable_scope('conv2') as scope:
+        ## N, T, F, 32
         # convolution
-        kernel = _variable_with_weight_decay(
-            'weights',
-            shape = [10, 5, params.num_filters, params.num_filters],
-            wd_value = None, use_fp16 = params.use_fp16)
-
-        ## N. T, F, 32
-        conv = tf.nn.conv2d(conv1, kernel,
+        kernel = _variable_with_weight_decay('weights',
+                                             shape=[10, 5, params.num_filters, params.num_filters],
+                                             wd_value=None,
+                                             use_fp16=params.use_fp16) 
+        conv = tf.nn.conv2d(conv1,
+                            kernel,
                             [1, 2, 1, 1],
-                            padding = 'VALID')
-        biases = _variable_on_cpu('biases', [params.num_filters],
-                                  tf.constant_initializer(-0.05),
-                                  params.use_fp16)
-        bias = tf.nn.bias_add(conv, biases)
+                            padding='VALID')
+        # biases = _variable_on_cpu('biases',
+        #                           [params.num_filters],
+        #                           tf.constant_initializer(-0.05),
+        #                           params.use_fp16)
+        # bias = tf.nn.bias_add(conv, biases)
+     
         ## N, T, F, 32
         # batch normalization
-        bn = custom_ops.batch_norm(bias)
+        bn = custom_ops.batch_norm(conv)
 
         # clipped ReLU
-        conv2 = custom_ops.relux(bn, capping = 20)
+        conv2 = custom_ops.relux(bn, capping=20)
         _activation_summary(conv2)
 
     ######################
     # recurrent layers
     ######################
-    # Reshape conv output to fit rnn input: N, T, F * 32
-    rnn_input = tf.reshape(conv2, [params.batch_size, -1, 75 * params.num_filters])
-    # Permute into time major order for rnn: T, N, F * 32
-    rnn_input = tf.transpose(rnn_input, perm = [1, 0, 2])
-    # Make one instance of cell on a fixed device,
-    # and use copies of the weights on other devices.
-    cell = custom_ops.CustomRNNCell2(
-            params.num_hidden,
-            use_fp16 = params.use_fp16)
-    multi_cell = tf.contrib.rnn.MultiRNNCell([cell] * params.num_rnn_layers)
+    # Reshape conv output to fit rnn input: N, T, F * C
+    fdim = conv2.get_shape().dims
+    feat_dim = fdim[2].value * fdim[3].value
+    rnn_input = tf.reshape(conv2, [params.batch_size, -1, feat_dim])
+
+    # Permute into time major order for rnn: T, N, F * C
+    rnn_input = tf.transpose(rnn_input, perm=[1, 0, 2])
+
+    cell = custom_ops.CustomRNNCell2(params.num_hidden, use_fp16=params.use_fp16)
+    cell_list = [cell] * params.num_rnn_layers
 
     rnn_seq_lens = get_rnn_seqlen(seq_lens)
-    if params.rnn_type == 'uni-dir':
-        rnn_outputs, _ = tf.nn.dynamic_rnn(multi_cell, rnn_input,
-                                           sequence_length = rnn_seq_lens,
-                                           dtype = dtype, time_major = True,
-                                           swap_memory = True)
-    else:
-        outputs, _ = tf.nn.bidirectional_dynamic_rnn(
-                multi_cell, multi_cell, rnn_input,
-                sequence_length = rnn_seq_lens, dtype = dtype,
-                time_major = True,
-                swap_memory = False)
-        outputs_fw, outputs_bw = outputs
-        rnn_outputs = outputs_fw + outputs_bw
+    rnn_outputs = custom_ops.stacked_brnn(cell_list, cell_list, params.num_hidden, params.num_rnn_layers, rnn_input, rnn_seq_lens, params.batch_size)
     _activation_summary(rnn_outputs)
 
     # Linear layer(WX + b) - softmax is applied by CTC cost function.
     with tf.variable_scope('softmax_linear') as scope:
-        weights = _variable_with_weight_decay(
-            'weights', [NUM_CLASSES, params.num_hidden],
-            wd_value = None,
-            use_fp16 = params.use_fp16)
+        weights = _variable_with_weight_decay('weights', [NUM_CLASSES, params.num_hidden],
+                                              wd_value=None,
+                                              use_fp16=params.use_fp16)
         biases = _variable_on_cpu('biases', [NUM_CLASSES],
                                   tf.constant_initializer(0.0),
                                   params.use_fp16)
-        logit_inputs = tf.reshape(rnn_outputs, [-1, cell.output_size])
-        logits = tf.add(tf.matmul(logit_inputs, weights, transpose_a = False, transpose_b = True),
-                        biases, name = scope.name)
+        logit_inputs = tf.reshape(rnn_outputs, [-1, params.num_hidden])
+        logits = tf.add(tf.matmul(logit_inputs, weights, transpose_a=False, transpose_b=True),
+                        biases, name=scope.name)
         logits = tf.reshape(logits, [-1, params.batch_size, NUM_CLASSES])
         _activation_summary(logits)
 
@@ -224,13 +216,13 @@ def loss(logits, labels, seq_lens):
     # print "seq len[after]: ", seq_lens
 
     # Calculate the average ctc loss across the batch.
-    ctc_loss = tf.nn.ctc_loss(labels = labels, inputs = tf.cast(logits, tf.float32), sequence_length = seq_lens, preprocess_collapse_repeated = True, time_major = True)
-    ctc_loss_mean = tf.reduce_mean(ctc_loss, name = 'ctc_loss')
+    ctc_loss = tf.nn.ctc_loss(labels=labels, inputs=tf.cast(logits, tf.float32), sequence_length=seq_lens, preprocess_collapse_repeated=True, time_major=True)
+    ctc_loss_mean = tf.reduce_mean(ctc_loss, name='ctc_loss')
     tf.add_to_collection('losses', ctc_loss_mean)
 
     # The total loss is defined as the cross entropy loss plus all
     # of the weight decay terms (L2 loss).
-    return tf.add_n(tf.get_collection('losses'), name = 'total_loss')
+    return tf.add_n(tf.get_collection('losses'), name='total_loss')
 
 
 def _add_loss_summaries(total_loss):
@@ -245,7 +237,7 @@ def _add_loss_summaries(total_loss):
       loss_averages_op: op for generating moving averages of losses.
     """
     # Compute the moving average of all individual losses and the total loss.
-    loss_averages = tf.train.ExponentialMovingAverage(0.9, name = 'avg')
+    loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
     losses = tf.get_collection('losses')
     loss_averages_op = loss_averages.apply(losses + [total_loss])
 
