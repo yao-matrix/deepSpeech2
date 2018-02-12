@@ -21,6 +21,59 @@ import tensorflow as tf
 from tqdm import tqdm
 
 
+def compute_linear_specgram(samples,
+                            sample_rate,
+                            stride_ms=10.0,
+                            window_ms=20.0,
+                            max_freq=None,
+                            eps=1e-14):
+    """Compute the linear spectrogram from FFT energy."""
+    if max_freq is None:
+        max_freq = sample_rate / 2
+    if max_freq > sample_rate / 2:
+        raise ValueError("max_freq must not be greater than half of "
+                         "sample rate.")
+    if stride_ms > window_ms:
+        raise ValueError("Stride size must not be greater than "
+                         "window size.")
+    stride_size = int(0.001 * sample_rate * stride_ms)
+    window_size = int(0.001 * sample_rate * window_ms)
+    # z-score normalizer
+    samples = samples - np.mean(samples)
+    samples = samples / np.std(samples)
+
+    specgram, freqs = _specgram_real(samples,
+                                     window_size=window_size,
+                                     stride_size=stride_size,
+                                     sample_rate=sample_rate)
+    ind = np.where(freqs <= max_freq)[0][-1] + 1
+    spectrogram = np.log(specgram[:ind, :] + eps)
+    spectrogram = spectrogram.transpose()
+    print "spectrogram shape: ", spectrogram.shape
+    return spectrogram
+
+def _specgram_real(samples, window_size, stride_size, sample_rate):
+    """Compute the spectrogram for samples from a real signal."""
+    # extract strided windows
+    truncate_size = (len(samples) - window_size) % stride_size
+    samples = samples[:len(samples) - truncate_size]
+    nshape = (window_size, (len(samples) - window_size) // stride_size + 1)
+    nstrides = (samples.strides[0], samples.strides[0] * stride_size)
+    windows = np.lib.stride_tricks.as_strided(samples, shape=nshape, strides=nstrides)
+    assert np.all(windows[:, 1] == samples[stride_size:(stride_size + window_size)])
+    # window weighting, squared Fast Fourier Transform (fft), scaling
+    weighting = np.hanning(window_size)[:, None]
+    fft = np.fft.rfft(windows * weighting, axis=0)
+    fft = np.absolute(fft)
+    fft = fft**2
+    scale = np.sum(weighting**2) * sample_rate
+    fft[1:-1, :] *= (2.0 / scale)
+    fft[(0, -1), :] /= scale
+    # prepare fft frequency list
+    freqs = float(sample_rate) / window_size * np.arange(fft.shape[0])
+    return fft, freqs
+
+
 def compute_mfcc(audio_data, sample_rate):
     ''' Computes the mel-frequency cepstral coefficients.
     The audio time series is normalised and its mfcc features are computed.
@@ -33,11 +86,13 @@ def compute_mfcc(audio_data, sample_rate):
 
     '''
 
+    # z-score normalizer
     audio_data = audio_data - np.mean(audio_data)
-    audio_data = audio_data / np.max(audio_data)
-    mfcc_feat = mfcc(audio_data, sample_rate, winlen = 0.025, winstep = 0.01,
-                     numcep = 161, nfilt = 322, nfft = 512, lowfreq = 0, highfreq = None,
-                     preemph = 0.97, ceplifter = 22, appendEnergy = True)
+    audio_data = audio_data / np.std(audio_data)
+
+    mfcc_feat = mfcc(audio_data, sample_rate, winlen=0.02, winstep=0.01,
+                     numcep=13, nfilt=26, nfft=512, lowfreq=0, highfreq=None,
+                     preemph=0.97, ceplifter=22, appendEnergy=True)
     print "mfcc shape: ", mfcc_feat.shape
     return mfcc_feat
 
@@ -111,7 +166,8 @@ def process_data(partition):
                 audio_file = parts[0]
                 file_path = os.path.join(os.path.dirname(filename), audio_file + '.flac')
                 audio, sample_rate = sf.read(file_path)
-                feats[audio_file] = compute_mfcc(audio, sample_rate)
+                # feats[audio_file] = compute_mfcc(audio, sample_rate)
+                feats[audio_file] = compute_linear_specgram(audio, sample_rate)
                 utt_len[audio_file] = feats[audio_file].shape[0]
                 target = ' '.join(parts[1:])
                 transcripts[audio_file] = [CHAR_TO_IX[i] for i in target]
@@ -127,7 +183,7 @@ def create_records():
     for partition in sorted(glob2.glob(AUDIO_PATH + '/*')):
         if os.path.isfile(partition):
             continue
-        print('Processing' + partition)
+        print('Processing ' + partition)
         feats, transcripts, utt_len = process_data(partition)
         sorted_utts = sorted(utt_len, key=utt_len.get)
         # bin into groups of 100 frames.
@@ -135,7 +191,7 @@ def create_records():
         min_t = int(utt_len[sorted_utts[0]] / 100)
 
         # Create destination directory
-        write_dir = os.path.join(AUDIO_PATH, 'processed', partition.split('/')[-1])
+        write_dir = os.path.join(AUDIO_PATH, '../../processed', partition.split('/')[-1])
         if tf.gfile.Exists(write_dir):
             tf.gfile.DeleteRecursively(write_dir)
         tf.gfile.MakeDirs(write_dir)
@@ -177,7 +233,7 @@ def create_records():
 
 # Audio path is the location of the directory that contains the librispeech
 # data partitioned into three folders: dev-clean, train-clean-100, test-clean
-AUDIO_PATH = '../data/LibriSpeech/audio'
+AUDIO_PATH = '/home/matrix/data/librispeech/LibriSpeech/' # '../data/LibriSpeech/audio'
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ' "
 CHAR_TO_IX = {ch: i for (i, ch) in enumerate(ALPHABET)}
 

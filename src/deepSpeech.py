@@ -60,7 +60,7 @@ def inputs(eval_data, data_dir, batch_size, use_fp16, shuffle):
       shuffle: bool, to shuffle the tfrecords or not. 
 
     Returns:
-      feats: MFCC. 3D tensor of [batch_size, T, F] size.
+      feats: Spetrogram. 3D tensor of [batch_size, T, F] size.
       labels: Labels. 1D tensor of [batch_size] size.
       seq_lens: SeqLens. 1D tensor of [batch_size] size.
 
@@ -111,7 +111,7 @@ def inference(sess, feats, seq_lens, params):
     #########################
     with tf.variable_scope('conv1') as scope:
         ## N, T, F
-        feats = tf.expand_dims(feats, axis=1)
+        feats = tf.expand_dims(feats, axis=3)
 
         ## N, T, F, 1
         # convolution
@@ -216,13 +216,19 @@ def loss(logits, labels, seq_lens):
     # print "seq len[after]: ", seq_lens
 
     # Calculate the average ctc loss across the batch.
-    ctc_loss = tf.nn.ctc_loss(labels=labels, inputs=tf.cast(logits, tf.float32), sequence_length=seq_lens, preprocess_collapse_repeated=True, time_major=True)
+    ctc_loss = tf.nn.ctc_loss(labels=labels, inputs=tf.cast(logits, tf.float32),
+                              sequence_length=seq_lens, 
+                              preprocess_collapse_repeated=False,
+                              ctc_merge_repeated=True,
+                              time_major=True,
+                              ignore_longer_outputs_than_inputs=True)
     ctc_loss_mean = tf.reduce_mean(ctc_loss, name='ctc_loss')
-    tf.add_to_collection('losses', ctc_loss_mean)
+    # tf.add_to_collection('losses', ctc_loss_mean)
 
     # The total loss is defined as the cross entropy loss plus all
     # of the weight decay terms (L2 loss).
-    return tf.add_n(tf.get_collection('losses'), name='total_loss')
+    # return tf.add_n(tf.get_collection('losses'), name='total_loss')
+    return ctc_loss_mean
 
 
 def _add_loss_summaries(total_loss):

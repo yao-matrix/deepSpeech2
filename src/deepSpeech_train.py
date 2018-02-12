@@ -77,7 +77,7 @@ def parse_args():
                         help='Continue training from checkpoint file')
     parser.add_argument('--rnn_type', type=str, default='bidirectional',
                         help='unidirectional or bidirectional')
-    parser.add_argument('--initial_lr', type=float, default=0.00001,
+    parser.add_argument('--initial_lr', type=float, default=2e-5,
                         help='Initial learning rate for training')
     parser.add_argument('--num_filters', type=int, default=32,
                         help='Number of convolutional filters')
@@ -85,7 +85,7 @@ def parse_args():
                         help='Decay to use for the moving average of weights')
     parser.add_argument('--num_epochs_per_decay', type=int, default=5,
                         help='Epochs after which learning rate decays')
-    parser.add_argument('--lr_decay_factor', type=float, default=0.9,
+    parser.add_argument('--lr_decay_factor', type=float, default=0.999,
                         help='Learning rate decay factor')
     parser.add_argument('--intra_op', type=int, default=44,
                         help='Intra op thread num')
@@ -127,10 +127,7 @@ def parse_args():
 
 ARGS = parse_args()
 
-if ARGS.nchw:
-  import deepSpeech_NCHW as deepSpeech
-else:
-  import deepSpeech
+import deepSpeech
 
 g = tf.Graph()
 if ARGS.dummy:
@@ -170,8 +167,8 @@ def tower_loss(sess, scope, feats, labels, seq_lens):
     total_loss = deepSpeech.loss(logits, labels, seq_lens)
 
     # Compute the moving average of all individual losses and the total loss.
-    loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
-    loss_averages_op = loss_averages.apply([total_loss])
+    # loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
+    # loss_averages_op = loss_averages.apply([total_loss])
 
     # Attach a scalar summary to all individual losses and the total loss;
     # do the same for the averaged version of the losses.
@@ -179,11 +176,10 @@ def tower_loss(sess, scope, feats, labels, seq_lens):
     # Name each loss as '(raw)' and name the moving average
     # version of the loss as the original loss name.
     tf.summary.scalar(loss_name + '(raw)', total_loss)
-    tf.summary.scalar(loss_name, loss_averages.average(total_loss))
 
     # Without this loss_averages_op would never run
-    with tf.control_dependencies([loss_averages_op]):
-        total_loss = tf.identity(total_loss)
+    # with tf.control_dependencies([loss_averages_op]):
+    #     total_loss = tf.identity(total_loss)
 
     return total_loss
 
@@ -274,9 +270,6 @@ def get_loss_grads(sess, data, optimizer):
                 # Calculate the loss for the deepSpeech model.
                 loss = tower_loss(sess, scope, feats, labels, seq_lens)
 
-                # Reuse variables for the next tower.
-                tf.get_variable_scope().reuse_variables()
-
                 # Retain the summaries from the final tower.
                 summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
 
@@ -284,7 +277,7 @@ def get_loss_grads(sess, data, optimizer):
                 grads_and_vars = optimizer.compute_gradients(loss)
 
                 # Clip the gradients.
-                clipped_grads_and_vars = [(tf.clip_by_value(grad, clip_value_min=400, clip_value_max=400), var) for grad, var in grads_and_vars]
+                clipped_grads_and_vars = [(tf.clip_by_value(grad, clip_value_min=-400, clip_value_max=400), var) for grad, var in grads_and_vars]
 
     return loss, clipped_grads_and_vars, summaries
 
@@ -327,6 +320,9 @@ def run_train_loop(sess, operations, saver):
         if step >= 10:
           profiling.append(duration)
 
+
+        # tf.clear_collection("losses")
+
         # Print progress periodically
         if step > 10 and step % 10 == 0:
             examples_per_sec = (ARGS.batch_size * 1) / np.average(profiling)
@@ -351,7 +347,7 @@ def run_train_loop(sess, operations, saver):
             summary_writer.add_summary(sess.run(summary_op), step)
 
         # Save the model checkpoint periodically
-        if step % 1000 == 0 or (step + 1) == ARGS.max_steps:
+        if step % 20000 == 0 or (step + 1) == ARGS.max_steps:
             checkpoint_path = os.path.join(ARGS.train_dir, 'model.ckpt')
             saver.save(sess, checkpoint_path, global_step=step)
 
@@ -446,11 +442,6 @@ def train():
         # Construct loss and gradient ops
         loss_op, grads, summaries = get_loss_grads(sess, data, optimizer)
 
-        # We must calculate the mean of each gradient. Note that this is the
-        # synchronization point across all towers.
-        # grads = average_gradients(tower_grads)
-        # grads = tower_grads[0]
-
         # Apply the gradients to adjust the shared variables.
         apply_gradient_op = optimizer.apply_gradients(grads,
                                                       global_step=global_step)
@@ -516,7 +507,7 @@ def main():
         tf.gfile.MakeDirs(ARGS.train_dir)
 
     # Dump command line arguments to a parameter file,
-    # in-case the network training resumes at a later time.
+    # in case the network training resumes at a later time.
     with open(os.path.join(ARGS.train_dir,
                            'deepSpeech_parameters.json'), 'w') as outfile:
         json.dump(vars(ARGS), outfile, sort_keys=True, indent=4)

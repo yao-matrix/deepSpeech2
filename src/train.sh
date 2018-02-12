@@ -18,10 +18,10 @@ unset TF_CPP_MIN_VLOG_LEVEL
 echo "-----------------------------------"
 echo "Start training"
 
-dummy=True   # True or False
-nchw=True    # True or False
-debug=False  # True or False
-engine="mkl" # tf, mkl, cudnn_rnn, mkldnn_rnn
+dummy=False   # True or False
+nchw=False    # True or False
+debug=False   # True or False
+engine="tf"   # tf, mkl, cudnn_rnn, mkldnn_rnn
 
 # echo $dummy
 
@@ -38,8 +38,8 @@ if [[ ${check}x != "OK"x ]];then
 fi
 
 model_dir='../models/librispeech/train'
-data_dir='../data/LibriSpeech/processed/'
-python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 40000 --num_rnn_layers 7 --num_hidden 1760 --num_filters 32 --initial_lr 1e-6 --train_dir $model_dir --data_dir $data_dir --debug ${debug} --nchw ${nchw} --engine ${engine} --dummy ${dummy}
+data_dir='/home/matrix/data/processed/'
+python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 400000 --num_rnn_layers 3 --num_hidden 2048 --num_filters 32 --initial_lr 5e-4 --train_dir $model_dir --data_dir $data_dir --debug ${debug} --nchw ${nchw} --engine ${engine} --dummy ${dummy}
 
 echo "Done"
 

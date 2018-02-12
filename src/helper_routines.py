@@ -28,7 +28,7 @@ def _activation_summary(act):
     tf.summary.scalar(tensor_name + '/sparsity', tf.nn.zero_fraction(act))
 
 
-def _variable_on_cpu(name, shape, initializer=None, use_fp16=False, trainable = True):
+def _variable_on_cpu(name, shape, initializer=None, use_fp16=False, trainable=True):
     """Helper to create a Variable stored on cpu memory.
 
     Args:
@@ -65,14 +65,14 @@ def _variable_with_weight_decay(name, shape, wd_value, use_fp16):
     var = _variable_on_cpu(
         name,
         shape,
-        tf.contrib.layers.variance_scaling_initializer(factor = 2.0,
-                                                       mode = 'FAN_IN',
-                                                       uniform = False,
-                                                       seed = None,
-                                                       dtype = dtype), use_fp16)
+        tf.contrib.layers.variance_scaling_initializer(factor=2.0,
+                                                       mode='FAN_IN',
+                                                       uniform=False,
+                                                       seed=None,
+                                                       dtype=dtype), use_fp16)
     if wd_value is not None:
         weight_decay = tf.cast(tf.mul(tf.nn.l2_loss(var),
-                                      wd_value, name = 'weight_loss'),
-                               tf.float32)  # CTC loss is in float32
+                                      wd_value, name='weight_loss'),
+                               tf.float32)
         tf.add_to_collection('losses', weight_decay)
     return var

@@ -25,7 +25,7 @@ def _generate_feats_and_label_batch(filename_queue, batch_size):
       batch_size: Number of utterances per batch.
 
     Returns:
-      feats: mfccs. 4D tensor of [batch_size, height, width, 3] size.
+      feats: spectrograms. 4D tensor of [batch_size, height, width, 3] size.
       labels: transcripts. List of length batch_size.
       seq_lens: Sequence Lengths. List of length batch_size.
     """
@@ -38,7 +38,7 @@ def _generate_feats_and_label_batch(filename_queue, batch_size):
         "labels": tf.VarLenFeature(dtype=tf.int64)
     }
     sequence_features = {
-        # mfcc features are 161 dimensional
+        # features are 161 dimensional
         "feats": tf.FixedLenSequenceFeature([161, ], dtype=tf.float32) 
     }
 
@@ -54,8 +54,8 @@ def _generate_feats_and_label_batch(filename_queue, batch_size):
         input_length=tf.cast(context_parsed['seq_len'], tf.int32),
         tensors=[sequence_parsed['feats'], context_parsed['labels']],
         batch_size=batch_size,
-        bucket_boundaries=list(range(100, 1900, 100)),
-        allow_smaller_final_batch=False,
+        bucket_boundaries=list(range(100, 2500, 100)),
+        allow_smaller_final_batch=True,
         num_threads=16,
         dynamic_pad=True)
 
