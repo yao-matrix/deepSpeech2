@@ -30,7 +30,6 @@ from tensorflow.python.client import timeline
 from tensorflow.python import debug as tf_debug
 
 import helper_routines
-import deepSpeech_dummy
 from setenvs import setenvs
 from setenvs import arglist
 
@@ -132,14 +131,12 @@ import deepSpeech
 g = tf.Graph()
 profiling = []
 
-def tower_loss(sess, scope, feats, labels, seq_lens):
+def tower_loss(sess, feats, labels, seq_lens):
     """Calculate the total loss on a single tower running the deepSpeech model.
 
     This function builds the graph for computing the loss per tower(GPU).
 
     ARGS:
-      scope: unique prefix string identifying the
-             deepSpeech tower, e.g. 'tower_0'
       feats: Tensor of shape BxFxT representing the
              audio features (mfccs or spectrogram).
       labels: sparse tensor holding labels of each utterance.
@@ -255,20 +252,18 @@ def get_loss_grads(sess, data, optimizer):
     # Calculate the gradients
     [feats, labels, seq_lens] = data
     grads_and_vars = None
-    with tf.variable_scope(tf.get_variable_scope()) as vscope:
-        with tf.device('/gpu'):
-            with tf.name_scope("loss_grad") as scope:
-                # Calculate the loss for the deepSpeech model.
-                loss = tower_loss(sess, scope, feats, labels, seq_lens)
+    with tf.device('/cpu'):
+        # Calculate the loss for the deepSpeech model.
+        loss = tower_loss(sess, feats, labels, seq_lens)
 
-                # Retain the summaries from the final tower.
-                summaries = tf.get_collection(tf.GraphKeys.SUMMARIES, scope)
+        # Retain the summaries from the final tower.
+        summaries = tf.get_collection(tf.GraphKeys.SUMMARIES)
 
-                # Calculate the gradients for the batch of data.
-                grads_and_vars = optimizer.compute_gradients(loss)
+        # Calculate the gradients for the batch of data.
+        grads_and_vars = optimizer.compute_gradients(loss)
 
-                # Clip the gradients.
-                clipped_grads_and_vars = [(tf.clip_by_value(grad, clip_value_min=-400, clip_value_max=400), var) for grad, var in grads_and_vars]
+        # Clip the gradients.
+        clipped_grads_and_vars = [(tf.clip_by_value(grad, clip_value_min=-400, clip_value_max=400), var) for grad, var in grads_and_vars]
 
     return loss, clipped_grads_and_vars, summaries
 
@@ -302,20 +297,11 @@ def run_train_loop(sess, operations, saver):
         # Print progress periodically
         if step > 10 and step % 10 == 0:
             examples_per_sec = (ARGS.batch_size * 1) / np.average(profiling)
-            if ARGS.dummy:
-                format_str = ('%s: step %d, '
-                              'loss = %.2f (%.1f examples/sec; %.3f '
-                              'sec/batch; '
-                              '%.3f dummy sec/batch)')
-                print(format_str % (datetime.now(), step, loss_value,
-                      examples_per_sec, np.average(profiling) / 1,
-                      dummy_input_duration))
-            else:
-                format_str = ('%s: step %d, '
-                              'loss = %.2f (%.1f examples/sec; %.3f '
-                              'sec/batch)')
-                print(format_str % (datetime.now(), step, loss_value,
-                      examples_per_sec, np.average(profiling) / 1))
+            format_str = ('%s: step %d, '
+                          'loss = %.2f (%.1f examples/sec; %.3f '
+                          'sec/batch)')
+            print(format_str % (datetime.now(), step, loss_value,
+                  examples_per_sec, np.average(profiling) / 1))
 
         # Run the summary ops periodically
         if step % 50 == 0 and not ARGS.dummy:

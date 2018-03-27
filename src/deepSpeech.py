@@ -27,7 +27,6 @@ from helper_routines import _variable_with_weight_decay
 from helper_routines import _activation_summary
 import custom_ops
 import deepSpeech_input
-import deepSpeech_dummy
 
 # Global constants describing the speech data set.
 NUM_CLASSES = deepSpeech_input.NUM_CLASSES
@@ -161,10 +160,13 @@ def inference(sess, feats, seq_lens, params):
     # Permute into time major order for rnn: T, N, F * C
     rnn_input = tf.transpose(rnn_input, perm=[1, 0, 2])
 
-    cell = custom_ops.CustomRNNCell2(params.num_hidden, use_fp16=params.use_fp16)
-    cell_list = [cell] * params.num_rnn_layers
+    fw_cell = custom_ops.CustomRNNCell2(params.num_hidden)
+    fw_cell_list = [fw_cell] * params.num_rnn_layers
 
-    rnn_outputs = custom_ops.stacked_brnn(cell_list, cell_list, params.num_hidden, params.num_rnn_layers, rnn_input, params.batch_size)
+    bw_cell = custom_ops.CustomRNNCell2(params.num_hidden)
+    bw_cell_list = [bw_cell] * params.num_rnn_layers
+
+    rnn_outputs = custom_ops.stacked_brnn(fw_cell_list, bw_cell_list, params.num_hidden, params.num_rnn_layers, rnn_input, params.batch_size)
     _activation_summary(rnn_outputs)
 
     # Linear layer(WX + b) - softmax is applied by CTC cost function.
