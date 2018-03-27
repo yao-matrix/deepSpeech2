@@ -130,15 +130,6 @@ ARGS = parse_args()
 import deepSpeech
 
 g = tf.Graph()
-if ARGS.dummy:
-    with g.as_default():
-        feats_batch = tf.placeholder(dtype=tf.float32, shape=[None, None, deepSpeech_dummy.freq_bins])
-        idx_batch = tf.placeholder(dtype=tf.int64)
-        vals_batch = tf.placeholder(dtype=tf.int64)
-        shape_batch = tf.placeholder(dtype=tf.int64)
-        # labels_batch = tf.sparse_placeholder(dtype=tf.int32)
-        seq_lens_batch = tf.placeholder(dtype=tf.int32, shape=[None])
-
 profiling = []
 
 def tower_loss(sess, scope, feats, labels, seq_lens):
@@ -297,29 +288,14 @@ def run_train_loop(sess, operations, saver):
     # Evaluate the ops for max_steps
     for step in range(ARGS.max_steps):
         start_time = time.time()
-        
-        if ARGS.dummy:
-            feats, idx, vals, shape, seq_lens = deepSpeech_dummy.inputs(ARGS.batch_size)
-            data_gen_time = time.time()
 
-            dummy_input_duration = data_gen_time - start_time
-            _, loss_value = sess.run([train_op, loss_op], options=run_options, run_metadata=run_metadata,
-                                     feed_dict={feats_batch: feats,
-                                                idx_batch: idx, 
-                                                vals_batch: vals,
-                                                shape_batch: shape,
-                                                seq_lens_batch: seq_lens
-                                                })
-        else:
-            _, loss_value = sess.run([train_op, loss_op], options=run_options, run_metadata=run_metadata)
- 
+        _, loss_value = sess.run([train_op, loss_op], options=run_options, run_metadata=run_metadata)
 
         duration = time.time() - start_time
         assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
 
         if step >= 10:
           profiling.append(duration)
-
 
         # tf.clear_collection("losses")
 
@@ -418,20 +394,15 @@ def train():
       This function build a set of ops required to build the model and optimize
       weights.
     """
-    with g.as_default(), tf.device('/gpu'):
+    with g.as_default(), tf.device('/device:GPU:0'):
         # Learning rate set up
         learning_rate, global_step = set_learning_rate()
 
         # Create an optimizer that performs gradient descent.
         optimizer = tf.train.AdamOptimizer(learning_rate)
 
-        # Fetch a batch worth of data for each tower
-        if not ARGS.dummy: 
-            data = fetch_data()
-        else: 
-            # idx, vals, s_shape = deepSpeech_dummy.dense_to_sparse(labels_batch, labels_batch_w, labels_batch_h)
-            labels_batch = tf.SparseTensor(indices=idx_batch, values=tf.cast(vals_batch, tf.int32), dense_shape=shape_batch)
-            data = [feats_batch, labels_batch, seq_lens_batch]
+        # Fetch a batch worth of data
+        data = fetch_data()
 
         # Start running operations on the Graph. allow_soft_placement
         # must be set to True to build towers on GPU, as some of the
@@ -486,9 +457,8 @@ def train():
         # for k, v in zip(mvariables_names, mvalues):
         #     print "Variable: ", k
 
-        if not ARGS.dummy:
-            # Start the queue runners.
-            tf.train.start_queue_runners(sess)
+        # Start the queue runners.
+        tf.train.start_queue_runners(sess)
 
         g.finalize()
 

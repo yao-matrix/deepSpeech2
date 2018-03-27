@@ -44,7 +44,9 @@ def get_rnn_seqlen(seq_lens):
     rnn_seq_lens = tf.div(tf.subtract(rnn_seq_lens, 9), 2.0)
     rnn_seq_lens = tf.ceil(rnn_seq_lens)
     rnn_seq_lens = tf.cast(rnn_seq_lens, tf.int32)
-    # rnn_seq_lens = tf.Print(rnn_seq_lens, [rnn_seq_lens], "Conved seq len: ", 32)
+
+ 
+    rnn_seq_lens = tf.Print(rnn_seq_lens, [rnn_seq_lens], "Conved seq len: ", summarize=32)
     # print "rnn_seq_lens shape: ", rnn_seq_lens.get_shape().as_list()
     return rnn_seq_lens
 
@@ -90,18 +92,6 @@ def inference(sess, feats, seq_lens, params):
     Returns:
       logits.
     """
-    # We instantiate all variables using tf.get_variable() instead of
-    # tf.Variable() in order to share variables across multiple GPU
-    # training runs. If we only ran this model on a single GPU,
-    # we could simplify this function
-    # by replacing all instances of tf.get_variable() with tf.Variable().
-
-    if params.use_fp16:
-        dtype = tf.float16
-    else:
-        dtype = tf.float32
-
-
     # data layout: N, T, F
     # feat_len = feats.get_shape().as_list()[-1]
     # print "feat shape: ", feats.get_shape().as_list()
@@ -174,19 +164,18 @@ def inference(sess, feats, seq_lens, params):
     cell = custom_ops.CustomRNNCell2(params.num_hidden, use_fp16=params.use_fp16)
     cell_list = [cell] * params.num_rnn_layers
 
-    rnn_seq_lens = get_rnn_seqlen(seq_lens)
-    rnn_outputs = custom_ops.stacked_brnn(cell_list, cell_list, params.num_hidden, params.num_rnn_layers, rnn_input, rnn_seq_lens, params.batch_size)
+    rnn_outputs = custom_ops.stacked_brnn(cell_list, cell_list, params.num_hidden, params.num_rnn_layers, rnn_input, params.batch_size)
     _activation_summary(rnn_outputs)
 
     # Linear layer(WX + b) - softmax is applied by CTC cost function.
     with tf.variable_scope('softmax_linear') as scope:
-        weights = _variable_with_weight_decay('weights', [NUM_CLASSES, params.num_hidden],
+        weights = _variable_with_weight_decay('weights', [NUM_CLASSES, params.num_hidden * 2],
                                               wd_value=None,
                                               use_fp16=params.use_fp16)
         biases = _variable_on_cpu('biases', [NUM_CLASSES],
                                   tf.constant_initializer(0.0),
                                   params.use_fp16)
-        logit_inputs = tf.reshape(rnn_outputs, [-1, params.num_hidden])
+        logit_inputs = tf.reshape(rnn_outputs, [-1, params.num_hidden * 2])
         logits = tf.add(tf.matmul(logit_inputs, weights, transpose_a=False, transpose_b=True),
                         biases, name=scope.name)
         logits = tf.reshape(logits, [-1, params.batch_size, NUM_CLASSES])
@@ -200,7 +189,7 @@ def loss(logits, labels, seq_lens):
 
     Add summary for "Loss" and "Loss/avg".
     Args:
-      logits: Logits from inference().
+      logits: Logits from inference(). layout: 
       labels: Labels from distorted_inputs or inputs(). 1-D tensor
               of shape [batch_size]
       seq_lens: Length of each utterance for ctc cost computation.
@@ -211,10 +200,13 @@ def loss(logits, labels, seq_lens):
     logits_shape = logits.get_shape().as_list()
     # print "logits shape: ", logits_shape
 
-    # print "seq len[before]: ", seq_lens
-    seq_lens = get_rnn_seqlen(seq_lens)
-    # print "seq len[after]: ", seq_lens
-
+    seq_len = tf.shape(logits)[0]
+    batch_size = logits_shape[1]
+    # seq_len = tf.Print(seq_len, [seq_len], "seq len: ")
+    # print("batch size: ", batch_size)
+    seq_lens = tf.fill([batch_size], seq_len)
+    # seq_lens = tf.Print(seq_lens, [seq_lens], "seq len: ", summarize=32)
+    
     # Calculate the average ctc loss across the batch.
     ctc_loss = tf.nn.ctc_loss(labels=labels, inputs=tf.cast(logits, tf.float32),
                               sequence_length=seq_lens, 
@@ -223,6 +215,7 @@ def loss(logits, labels, seq_lens):
                               time_major=True,
                               ignore_longer_outputs_than_inputs=True)
     ctc_loss_mean = tf.reduce_mean(ctc_loss, name='ctc_loss')
+    ctc_loss_mean = tf.Print(ctc_loss_mean, [ctc_loss_mean], "CTC loss: ")
     # tf.add_to_collection('losses', ctc_loss_mean)
 
     # The total loss is defined as the cross entropy loss plus all

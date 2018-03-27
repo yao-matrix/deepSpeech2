@@ -62,14 +62,11 @@ def _variable_with_weight_decay(name, shape, wd_value, use_fp16):
       Variable Tensor
     """
     dtype = tf.float16 if use_fp16 else tf.float32
-    var = _variable_on_cpu(
-        name,
-        shape,
-        tf.contrib.layers.variance_scaling_initializer(factor=2.0,
-                                                       mode='FAN_IN',
-                                                       uniform=False,
-                                                       seed=None,
-                                                       dtype=dtype), use_fp16)
+    var = _variable_on_cpu(name, shape,
+                           tf.contrib.layers.variance_scaling_initializer(mode='FAN_IN',
+                                                                          uniform=False,
+                                                                          seed=None,
+                                                                          dtype=dtype), use_fp16)
     if wd_value is not None:
         weight_decay = tf.cast(tf.mul(tf.nn.l2_loss(var),
                                       wd_value, name='weight_loss'),

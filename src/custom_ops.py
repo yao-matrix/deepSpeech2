@@ -9,6 +9,7 @@ from tensorflow.contrib.rnn import BasicRNNCell
 from tensorflow.python.util import nest
 from tensorflow.python.training import moving_averages
 from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import control_flow_ops
 
 from helper_routines import _variable_on_cpu
 
@@ -55,8 +56,8 @@ class CustomRNNCell2(BasicRNNCell):
            U: num_units * num_units
         """
         with tf.variable_scope(scope or type(self).__name__):
-            # print "rnn cell input size: ", inputs.get_shape().as_list()
-            # print "rnn cell state size: ", state.get_shape().as_list()
+            print "rnn cell input size: ", inputs.get_shape().as_list()
+            print "rnn cell state size: ", state.get_shape().as_list()
             wsize = inputs.get_shape()[1]
             w = _variable_on_cpu('W', [self._num_units, wsize], initializer=tf.orthogonal_initializer(), use_fp16=self.use_fp16)
             resi = tf.matmul(inputs, w, transpose_a=False, transpose_b=True)
@@ -76,21 +77,22 @@ class CustomRNNCell2(BasicRNNCell):
         return output, output
 
 
-def stacked_brnn(cells_fw, cells_bw, num_units, num_layers, inputs, seq_lengths, batch_size):
+def stacked_brnn(cells_fw, cells_bw, num_units, num_layers, inputs, batch_size):
     """
     multi layer bidirectional rnn
     :param cell: RNN cell
     :param num_units: hidden unit of RNN cell
     :param num_layers: the number of layers
     :param inputs: the input sequence
-    :param seq_lengths: sequence length
     :param batch_size: batch size
     :return: the output of last layer bidirectional rnn with concatenating
     """
     prev_layer = inputs
     for i, (cell_fw, cell_bw) in enumerate(zip(cells_fw, cells_bw)):
         with tf.variable_scope("brnn-%d" % i) as scope:
-            (outputs, state) = tf.nn.bidirectional_dynamic_rnn(cell_fw, cell_bw, prev_layer, dtype=tf.float32) 
+            state_fw = cell_fw.zero_state(batch_size, tf.float32)
+            state_bw = cell_fw.zero_state(batch_size, tf.float32)
+            (outputs, state) = tf.nn.bidirectional_dynamic_rnn(cell_fw, cell_bw, prev_layer, initial_state_fw=state_fw, initial_state_bw=state_bw, dtype=tf.float32, time_major=True) 
             outputs_fw, outputs_bw = outputs
             # prev_layer = tf.add_n([outputs_fw, outputs_bw])
             prev_layer = array_ops.concat(outputs, 2)
@@ -171,19 +173,20 @@ def batch_norm(x, scope=None, is_train=True, data_format=None):
     with tf.variable_scope(scope or 'bn'):
         inputs_shape = x.get_shape()
         param_shape = inputs_shape[-1]        
-        beta = _variable_on_cpu('beta', [param_shape], initializer=tf.zeros_initializer())
-        gamma = _variable_on_cpu('gamma', [param_shape], initializer=tf.ones_initializer())
+        offset = _variable_on_cpu('offset', [param_shape], initializer=tf.zeros_initializer())
+        scale = _variable_on_cpu('scale', [param_shape], initializer=tf.ones_initializer())
+
+        moving_mean = _variable_on_cpu('moving_mean', [param_shape], initializer=tf.zeros_initializer())
+        moving_var = _variable_on_cpu('moving_var', [param_shape], initializer=tf.ones_initializer())
         batch_mean, batch_var = tf.nn.moments(x, [0, 1, 2], name='moments')
-        ema = tf.train.ExponentialMovingAverage(decay=0.5, zero_debias=True)
-        def mean_var_with_update():
-            ema_apply_op = ema.apply([batch_mean, batch_var])
-            with tf.control_dependencies([ema_apply_op]):
-                return tf.identity(batch_mean), tf.identity(batch_var)
-        if is_train:
-            mean, var = mean_var_with_update()
-        else:
-            mean, var = lambda : (ema.average(batch_mean), ema.average(batch_var))
-        normed = tf.nn.batch_normalization(x, mean, var, beta, gamma, 1e-5)
+        update_moving_mean = moving_averages.assign_moving_average(moving_mean, batch_mean, 0.9997)
+        update_moving_var = moving_averages.assign_moving_average(moving_var, batch_var, 0.9997)
+        tf.add_to_collection("update_ops", update_moving_mean)
+        tf.add_to_collection("update_ops", update_moving_var)
+
+        mean, var = control_flow_ops.cond(tf.cast(is_train, "bool"), lambda:(batch_mean, batch_var), lambda:(moving_mean, moving_var))
+
+        normed = tf.nn.batch_normalization(x, mean, var, offset, scale, 0.001)
     return normed
 
 
@@ -193,15 +196,22 @@ def seq_batch_norm(x, scope=None, is_train=True):
         with tf.variable_scope("sbn", reuse=None):
             inputs_shape = x.get_shape()
             param_shape = inputs_shape[-1]
-            offset = _variable_on_cpu('beta', [param_shape], initializer=tf.zeros_initializer(), trainable=True)
-            scale = _variable_on_cpu('gamma', [param_shape], initializer=tf.ones_initializer(), trainable=True)
+            
             batch_mean, batch_var = tf.nn.moments(x, [0], name='moments')
 
             moving_mean = _variable_on_cpu('moving_mean', [param_shape], initializer=tf.zeros_initializer(), trainable=False)	
-            moving_variance = _variable_on_cpu('moving_variance', [param_shape], initializer=tf.ones_initializer(), trainable=False)
-            moving_averages.assign_moving_average(moving_mean, batch_mean, 0.997)
-            moving_averages.assign_moving_average(moving_variance, batch_var, 0.997)
-            normed = tf.nn.batch_normalization(x, moving_mean, moving_variance, offset, scale, 1e-9)
+            moving_var = _variable_on_cpu('moving_var', [param_shape], initializer=tf.ones_initializer(), trainable=False)
+            update_moving_mean = moving_averages.assign_moving_average(moving_mean, batch_mean, 0.997)
+            update_moving_var = moving_averages.assign_moving_average(moving_var, batch_var, 0.997)
+            tf.add_to_collection("update_ops", update_moving_mean)
+            tf.add_to_collection("update_ops", update_moving_var)
+
+            mean, var = control_flow_ops.cond(tf.cast(is_train, "bool"), lambda:(batch_mean, batch_var), lambda:(moving_mean, moving_var))
+
+            offset = _variable_on_cpu('beta', [param_shape], initializer=tf.zeros_initializer(), trainable=True)
+            scale = _variable_on_cpu('gamma', [param_shape], initializer=tf.ones_initializer(), trainable=True)
+     
+            normed = tf.nn.batch_normalization(x, mean, var, offset, scale, 0.001)
     return normed
 
 
