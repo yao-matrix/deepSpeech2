@@ -234,12 +234,15 @@ def set_learning_rate():
 
 def fetch_data():
     """ Fetch features, labels and sequence_lengths from a common queue."""
-    tot_batch_size = ARGS.batch_size
-    feats, labels, seq_lens = deepSpeech.inputs(eval_data='train',
-                                                data_dir=ARGS.data_dir,
-                                                batch_size=tot_batch_size,
-                                                use_fp16=ARGS.use_fp16,
-                                                shuffle=ARGS.shuffle)
+    tot_batch_size = ARGS.batch_size 
+    with tf.device('/cpu'):
+        feats, labels, seq_lens = deepSpeech.inputs(eval_data='train',
+                                                    data_dir=ARGS.data_dir,
+                                                    batch_size=tot_batch_size,
+                                                    use_fp16=ARGS.use_fp16,
+                                                    shuffle=ARGS.shuffle)
+        dense_labels = tf.sparse_tensor_to_dense(labels)
+        tf.Print(dense_labels, [dense_labels], "labels")
 
     # Split features and labels and sequence lengths for each tower
     return feats, labels, seq_lens
@@ -270,7 +273,7 @@ def get_loss_grads(sess, data, optimizer):
 
 def run_train_loop(sess, operations, saver):
     """ Train the model for required number of steps."""
-    (train_op, loss_op, summary_op) = operations
+    (loss_op, train_op, summary_op) = operations
 
     run_options = None
     run_metadata = None
@@ -282,9 +285,30 @@ def run_train_loop(sess, operations, saver):
 
     # Evaluate the ops for max_steps
     for step in range(ARGS.max_steps):
+        print "Step: ", step
+
         start_time = time.time()
 
-        _, loss_value = sess.run([train_op, loss_op], options=run_options, run_metadata=run_metadata)
+        # print "Trainable Variables: "
+        # tvariables_names = [v.name for v in tf.trainable_variables()]
+        # tvalues = sess.run(tvariables_names)
+        # for k, v in zip(tvariables_names, tvalues):
+        #     print "Variable: ", k
+        #     print v
+        # print "Global Variables: "
+        # gvariables_names = [v.name for v in tf.global_variables()]
+        # gvalues = sess.run(gvariables_names)
+        # for k, v in zip(gvariables_names, gvalues):
+        #     print "Variable: ", k
+        #     print v
+        # print "Moving Average Variables: "
+        # mvariables_names = [v.name for v in tf.moving_average_variables()]
+        # mvalues = sess.run(mvariables_names)
+        # for k, v in zip(mvariables_names, mvalues):
+        #     print "Variable: ", k
+        #     print v
+
+        loss_value, _ = sess.run([loss_op, train_op], options=run_options, run_metadata=run_metadata)
 
         duration = time.time() - start_time
         assert not np.isnan(loss_value), 'Model diverged with loss = NaN'
@@ -304,7 +328,7 @@ def run_train_loop(sess, operations, saver):
                   examples_per_sec, np.average(profiling) / 1))
 
         # Run the summary ops periodically
-        if step % 50 == 0 and not ARGS.dummy:
+        if 0:
             summary_writer = tf.summary.FileWriter(ARGS.train_dir, sess.graph)
             summary_writer.add_summary(sess.run(summary_op), step)
 
@@ -404,11 +428,13 @@ def train():
                                                       global_step=global_step)
 
         # Track the moving averages of all trainable variables.
-        variable_averages = tf.train.ExponentialMovingAverage(ARGS.moving_avg_decay, global_step)
-        variables_averages_op = variable_averages.apply(tf.trainable_variables())
+        # variable_averages = tf.train.ExponentialMovingAverage(ARGS.moving_avg_decay, global_step)
+        # variables_averages_op = variable_averages.apply(tf.trainable_variables())
 
         # Group all updates to into a single train op.
-        train_op = tf.group(apply_gradient_op, variables_averages_op)
+        # train_op = tf.group(apply_gradient_op, variables_averages_op)
+
+        train_op = apply_gradient_op
 
         # Build summary op
         summary_op = add_summaries(summaries, learning_rate, grads)
@@ -449,7 +475,7 @@ def train():
         g.finalize()
 
         # Run training loop
-        run_train_loop(sess, (train_op, loss_op, summary_op), saver)
+        run_train_loop(sess, (loss_op, train_op, summary_op), saver)
 
 
 def main():

@@ -38,9 +38,10 @@ def compute_linear_specgram(samples,
                          "window size.")
     stride_size = int(0.001 * sample_rate * stride_ms)
     window_size = int(0.001 * sample_rate * window_ms)
-    # z-score normalizer
-    samples = samples - np.mean(samples)
-    samples = samples / np.std(samples)
+
+    ## z-score normalizer
+    # samples = samples - np.mean(samples)
+    # samples = samples / np.std(samples)
 
     specgram, freqs = _specgram_real(samples,
                                      window_size=window_size,
@@ -48,8 +49,14 @@ def compute_linear_specgram(samples,
                                      sample_rate=sample_rate)
     ind = np.where(freqs <= max_freq)[0][-1] + 1
     spectrogram = np.log(specgram[:ind, :] + eps)
+
     spectrogram = spectrogram.transpose()
-    print "spectrogram shape: ", spectrogram.shape
+
+    # z-score normalizer
+    spectrogram = spectrogram - np.mean(spectrogram)
+    spectrogram = spectrogram / np.std(spectrogram)
+
+    # print "spectrogram shape: ", spectrogram.shape
     return spectrogram
 
 def _specgram_real(samples, window_size, stride_size, sample_rate):
@@ -171,6 +178,8 @@ def process_data(partition):
                 utt_len[audio_file] = feats[audio_file].shape[0]
                 target = ' '.join(parts[1:])
                 transcripts[audio_file] = [CHAR_TO_IX[i] for i in target]
+                if ((utt_len[audio_file] - 19) // 2 - 9) // 2 == 60:
+                  print("file[%s] -- utterance length: %d, transcripts lenght: %d" % (audio_file, ((utt_len[audio_file] - 19) // 2 - 9) // 2, len(transcripts[audio_file])))
     return feats, transcripts, utt_len
 
 

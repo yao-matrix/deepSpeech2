@@ -12,7 +12,7 @@ import tensorflow as tf
 # preprocess_Librispeech.py
 ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ' "  # for LibriSpeech
 NUM_CLASSES = len(ALPHABET) + 1  # Additional class for blank character
-NUM_PER_EPOCH_FOR_TRAIN = 28535
+NUM_PER_EPOCH_FOR_TRAIN = 28538
 NUM_PER_EPOCH_FOR_EVAL = 2703
 NUM_PER_EPOCH_FOR_TEST = 2620
 
@@ -39,7 +39,7 @@ def _generate_feats_and_label_batch(filename_queue, batch_size):
     }
     sequence_features = {
         # features are 161 dimensional
-        "feats": tf.FixedLenSequenceFeature([161, ], dtype=tf.float32) 
+        "feats": tf.FixedLenSequenceFeature([161], dtype=tf.float32) 
     }
 
     # Parse the example (returns a dictionary of tensors)
