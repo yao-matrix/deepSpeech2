@@ -39,7 +39,7 @@ fi
 
 model_dir='../models/librispeech/train'
 data_dir='/home/matrix/data/processed/'
-python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 400000 --num_rnn_layers 3 --num_hidden 2048 --num_filters 32 --initial_lr 5e-4 --train_dir $model_dir --data_dir $data_dir --debug ${debug} --nchw ${nchw} --engine ${engine} --dummy ${dummy}
+python deepSpeech_train.py --batch_size 32 --no-shuffle --max_steps 400000 --num_rnn_layers 3 --num_hidden 1024 --num_filters 32 --initial_lr 5e-4 --train_dir $model_dir --data_dir $data_dir --debug ${debug} --nchw ${nchw} --engine ${engine} --dummy ${dummy}
 
 echo "Done"
 
